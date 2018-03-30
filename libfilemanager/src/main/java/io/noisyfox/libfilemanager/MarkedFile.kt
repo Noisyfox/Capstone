@@ -8,23 +8,26 @@ import java.io.InputStream
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
 class MarkedFile(
-        private val fileLock: ReentrantReadWriteLock,
-        private val manager: FileManager,
-        private val hash: String,
+        fileLock: ReentrantReadWriteLock,
+        manager: FileManager,
+        hash: String,
         val metadata: MetadataModel) {
 
-    fun getReadLock() = fileLock.readLock()
+    internal val statusFile = File(manager.baseDir, "$hash.prog.json")
+    internal val dataFile = File(manager.baseDir, "$hash.data")
 
-    fun getWriteLock() = fileLock.writeLock()
+    val readLock = fileLock.readLock()
+
+    val writeLock = fileLock.writeLock()
 
     /**
      * Get stream for read
      */
     fun openStream(): InputStream {
-        getReadLock().withTryLock("File already opened for writing!") {
+        readLock.withTryLock("File already opened for writing!") {
             ensureComplete()
-            getReadLock().unlockOnException { lock ->
-                FileInputStream(getDataFile()).closeOnException { stream ->
+            readLock.unlockOnException { lock ->
+                FileInputStream(dataFile).closeOnException { stream ->
                     return LockedInputStream(stream, lock)
                 }
             }
@@ -38,7 +41,7 @@ class MarkedFile(
     }
 
     fun isComplete(): Boolean {
-        getReadLock().tryLock {
+        readLock.tryLock {
             return _isComplete()
         }
 
@@ -47,28 +50,24 @@ class MarkedFile(
 
     private fun _isComplete() = readStatus().completed
 
-    fun openWriter() {
-        getWriteLock().lock()
-        _openWriter()
-    }
-
-    fun tryOpenWriter() {
-        if (getWriteLock().tryLock()) {
-            _openWriter()
+    fun openWriter(): MarkedFileWriter {
+        writeLock.unlockOnException { lock ->
+            return MarkedFileWriter(this, lock)
         }
     }
 
-    fun _openWriter() {
+    fun tryOpenWriter(): MarkedFileWriter? {
+        writeLock.tryLock {
+            return openWriter()
+        }
 
+        return null
     }
 
-    private fun readStatus(): ProgressModel {
+    internal fun readStatus(): ProgressModel {
         return jacksonObjectMapper()
-                .readValue(getStatusFile())
+                .readValue(statusFile)
     }
-
-    private fun getStatusFile() = File(manager.baseDir, "$hash.prog.json")
-    private fun getDataFile() = File(manager.baseDir, "$hash.data")
 
     private class LockedInputStream(private val innerStream: InputStream,
                                     private val lock: ReentrantReadWriteLock.ReadLock) : InputStream() {
@@ -101,11 +100,13 @@ class MarkedFile(
 
         @Synchronized
         override fun close() {
-            innerStream.close()
-
-            if (!unlocked) {
-                lock.unlock()
-                unlocked = true
+            try {
+                innerStream.close()
+            } finally {
+                if (!unlocked) {
+                    lock.unlock()
+                    unlocked = true
+                }
             }
         }
 
@@ -117,8 +118,4 @@ class MarkedFile(
             return innerStream.markSupported()
         }
     }
-}
-
-class FileBlock {
-
 }

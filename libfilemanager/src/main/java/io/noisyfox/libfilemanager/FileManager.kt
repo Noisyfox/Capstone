@@ -27,7 +27,7 @@ class FileManager(internal val baseDir: String) {
     }
 
     companion object {
-        fun createMetaFromFile(file: String, id: String, metaOutDir: String, url: String = "", blockSize: Long = 1024 * 1024 /* 1 MB */) {
+        fun createMetaFromFile(file: String, id: String, metaOutDir: String, url: String = "", blockSize: Int = 1024 * 1024 /* 1 MB */) {
             val inputFile = File(file)
             val meta = FileInputStream(inputFile).buffered().use {
                 val fileSize = inputFile.length()
@@ -39,16 +39,16 @@ class FileManager(internal val baseDir: String) {
 
                 val blocks = mutableListOf<BlockModel>()
 
-                var currentBlock: Long
+                var currentBlock: Int
                 do {
-                    currentBlock = 0L
+                    currentBlock = 0
                     blockDigest.reset()
                     while (true) {
                         val blockRemain = blockSize - currentBlock
-                        if (blockRemain == 0L) {
+                        if (blockRemain == 0) {
                             break
                         }
-                        val s = it.read(buffer, 0, min(blockRemain, 1024L).toInt())
+                        val s = it.read(buffer, 0, min(blockRemain, 1024))
                         if (s == -1) {
                             break
                         }
@@ -56,10 +56,10 @@ class FileManager(internal val baseDir: String) {
                         mainDigest.update(buffer, 0, s)
                         blockDigest.update(buffer, 0, s)
                     }
-                    if (currentBlock != 0L) {
+                    if (currentBlock != 0) {
                         blocks.add(BlockModel(blockDigest.toHexString(), currentBlock))
                     }
-                } while (currentBlock != 0L)
+                } while (currentBlock != 0)
 
                 MetadataModel(id, url, fileSize, mainDigest.toHexString(), blocks)
             }

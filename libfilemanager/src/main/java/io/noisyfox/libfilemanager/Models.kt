@@ -8,25 +8,82 @@ data class MetadataModel(
         val size: Long,
         val hash: String,
         val blocks: List<BlockModel>
-)
+) {
+    private val offsets: List<Long>
+
+    init {
+        val _offsets = mutableListOf<Long>()
+
+        blocks.fold(0L) { offset, b ->
+            _offsets.add(offset)
+
+            offset + b.size
+        }
+
+        offsets = _offsets
+    }
+
+    fun getBlockOffset(index: Int) = offsets[index]
+}
 
 data class BlockModel(
         val hash: String,
-        val size: Long
+        val size: Int
 )
 
 data class ProgressModel(
         val completed: Boolean = false,
         @JsonProperty("completed_blocks") val completedBlocks: List<Int> = listOf(),
         @JsonProperty("other_blocks") val otherBlocks: Map<String, BlockProgressModel> = mapOf()
-)
+) {
+    fun withBlockComplete(index: Int): ProgressModel {
+        if (index in completedBlocks) {
+            return this
+        }
+        ensureNotComplete()
+
+        return ProgressModel(
+                completed = completed,
+                completedBlocks = (completedBlocks + index).sorted(),
+                otherBlocks = otherBlocks.filter { it.key != index.toString() }
+        )
+    }
+
+    fun withAllComplete(): ProgressModel {
+        if (otherBlocks.isNotEmpty()) {
+            throw IllegalStateException("otherBlocks is not empty! Progress could lost!")
+        }
+
+        return ProgressModel(true, completedBlocks, mapOf())
+    }
+
+    fun withStatus(index: Int, progress: BlockProgressModel): ProgressModel {
+        ensureNotComplete()
+        if (index in completedBlocks) {
+            throw IllegalStateException("Can't update a completed block!")
+        }
+
+        return ProgressModel(
+                completed,
+                completedBlocks,
+                otherBlocks + Pair(index.toString(), progress)
+        )
+    }
+
+    private fun ensureNotComplete() {
+        if (completed) {
+            throw IllegalStateException("Can't update a completed file!")
+        }
+    }
+}
 
 enum class ProgressStatus {
     Downloading,
+    HashMismatch,
     Failure
 }
 
 data class BlockProgressModel(
-        val progress: Long,
+        val progress: Int,
         val status: ProgressStatus
 )
