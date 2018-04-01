@@ -12,10 +12,11 @@ class MarkedFileWriter(
         private val file: MarkedFile,
         private val lock: ReentrantReadWriteLock.WriteLock
 ) : Closeable {
-
     private var unlocked: Boolean = false
-    private var status: ProgressModel = file.readStatus()
     private val openedBlocks: MutableSet<Int> = mutableSetOf()
+
+    var status: ProgressModel = file.readStatus()
+        private set
 
     val blockCount
         get() = file.metadata.blocks.count()

@@ -1,9 +1,11 @@
 package io.noisyfox.libfilemanager
 
+import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import java.io.File
 import java.io.FileInputStream
+import java.io.FileNotFoundException
 import java.io.InputStream
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
@@ -48,7 +50,11 @@ class MarkedFile(
         return false
     }
 
-    private fun _isComplete() = readStatus().completed
+    private fun _isComplete() = try {
+        readStatus().completed
+    } catch (e: FileNotFoundException) {
+        false
+    }
 
     fun openWriter(): MarkedFileWriter {
         writeLock.unlockOnException { lock ->
@@ -65,8 +71,20 @@ class MarkedFile(
     }
 
     internal fun readStatus(): ProgressModel {
-        return jacksonObjectMapper()
-                .readValue(statusFile)
+        try {
+            return jacksonObjectMapper()
+                    .readValue(statusFile)
+        } catch (e: FileNotFoundException) {
+            if (writeLock.isHeldByCurrentThread) {
+                // Create progress file
+                val v = ProgressModel()
+                jacksonObjectMapper()
+                        .enable(SerializationFeature.INDENT_OUTPUT)
+                        .writeValue(statusFile, v)
+                return v
+            }
+            throw e
+        }
     }
 
     private class LockedInputStream(private val innerStream: InputStream,
