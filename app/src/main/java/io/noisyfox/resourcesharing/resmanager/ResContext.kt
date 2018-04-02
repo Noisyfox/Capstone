@@ -136,7 +136,13 @@ internal class ResContext(
         return try {
             when (command) {
                 null, ResService.COMMAND_DATA -> {
-                    // TODO: Read & return data
+                    val data = file.readBlock(block)
+
+                    val rep = OcRepresentation()
+                    rep.setValue(ResService.PARAM_COMMAND, ResService.COMMAND_DATA)
+                    rep.setValue(ResService.PARAM_DATA, data)
+
+                    request.sendResponse(rep)
                     EntityHandlerResult.OK
                 }
                 ResService.COMMAND_HASH -> {

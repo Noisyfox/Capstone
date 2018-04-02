@@ -1,5 +1,7 @@
 package io.noisyfox.libfilemanager
 
+import java.io.IOException
+import java.io.InputStream
 import java.nio.ByteBuffer
 import java.nio.charset.Charset
 import java.security.MessageDigest
@@ -35,6 +37,23 @@ fun ByteBuffer.getSHA256HexString(offset: Int, len: Int): String {
     }
 
     return d.toHexString()
+}
+
+fun <T : InputStream> T.readFull(out: ByteArray): T = this.readFull(out, 0, out.size)
+
+fun <T : InputStream> T.readFull(out: ByteArray, offset: Int, len: Int): T {
+    var off = offset
+    var l = len
+    while (l > 0) {
+        val n = this.read(out, off, len)
+        if (n == -1) {
+            throw IOException("No enough content!")
+        }
+        off += n
+        l -= n
+    }
+
+    return this
 }
 
 inline fun <T> Lock.withTryLock(errorMsg: String, action: () -> T): T {

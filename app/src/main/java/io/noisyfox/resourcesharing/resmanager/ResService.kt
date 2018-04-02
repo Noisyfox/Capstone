@@ -58,6 +58,8 @@ class ResService(
                     EnumSet.of(ResourceProperty.DISCOVERABLE, ResourceProperty.OBSERVABLE)
             )
 
+            // TODO: start resource index discovery
+
             onInited?.invoke(this)
         }
     }
@@ -77,10 +79,8 @@ class ResService(
      */
     fun registerResource(fileId: String) {
         runOnWorkingThread2 {
-            val f = managedResources[fileId] ?: run<ResContext> {
-                val nf = ResContext(this, fileManager.getFile(fileId))
-                managedResources[fileId] = nf
-                nf
+            val f = managedResources.getOrPut(fileId) {
+                ResContext(this, fileManager.getFile(fileId))
             }
 
             // Check if f is complete
@@ -166,6 +166,7 @@ class ResService(
     companion object {
         const val PARAM_COMMAND: String = "cmd"
         const val PARAM_HASH: String = "hash"
+        const val PARAM_DATA: String = "data"
         const val COMMAND_INDEX: String = "get_index"
         const val COMMAND_HASH: String = "get_hash"
         const val COMMAND_DATA: String = "get_data"

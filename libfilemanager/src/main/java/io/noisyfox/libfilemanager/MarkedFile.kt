@@ -3,10 +3,7 @@ package io.noisyfox.libfilemanager
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
-import java.io.File
-import java.io.FileInputStream
-import java.io.FileNotFoundException
-import java.io.InputStream
+import java.io.*
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
 class MarkedFile(
@@ -33,6 +30,19 @@ class MarkedFile(
                     return LockedInputStream(stream, lock)
                 }
             }
+        }
+    }
+
+    fun readBlock(block: Int): ByteArray {
+        openStream().use {
+            val n = metadata.getBlockOffset(block)
+            if (it.skip(n) != n) {
+                throw IOException("Unable to set read offset!")
+            }
+            val result = ByteArray(metadata.blocks[block].size)
+            it.readFull(result)
+
+            return result
         }
     }
 
