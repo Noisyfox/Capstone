@@ -17,7 +17,6 @@ class ResService(
 
     internal val namespaceHash = namespace.getSHA256HexString()
     internal val baseUri = "/foxres/$namespaceHash"
-    private val indexUri = "$baseUri/index"
 
     private val workingThread = object : HandlerThread("Resource Service Main Thread") {
         override fun onLooperPrepared() {
@@ -29,31 +28,13 @@ class ResService(
     private val managedResources: MutableMap<String, ResContext> = mutableMapOf()
     private var indexHandler: OcResourceHandle? = null
     private val indexEntityHandler: OcPlatform.EntityHandler = OcPlatform.EntityHandler { request ->
+        if (request.resourceUri != baseUri) {
+            return@EntityHandler EntityHandlerResult.FORBIDDEN
+        }
+
         when (request.requestType) {
             RequestType.GET -> {
-                val queryParameters = request.queryParameters
-                val command = queryParameters[PARAM_COMMAND]
-                if (command == null || command != COMMAND_INDEX) {
-                    EntityHandlerResult.FORBIDDEN
-                } else {
-                    // TODO: Generate index data
-                    // Send index
-                    try {
-                        val rep = OcRepresentation()
-                        rep.setValue(PARAM_COMMAND, COMMAND_INDEX)
-
-                        val response = OcResourceResponse()
-                        response.setRequestHandle(request.requestHandle)
-                        response.setResourceHandle(request.resourceHandle)
-                        response.setResourceRepresentation(rep)
-                        OcPlatform.sendResponse(response)
-
-                        EntityHandlerResult.OK
-                    } catch (e: OcException) {
-                        e.printStackTrace()
-                        EntityHandlerResult.ERROR
-                    }
-                }
+                handleRequest(request)
             }
             else -> EntityHandlerResult.FORBIDDEN
         }
@@ -70,7 +51,7 @@ class ResService(
             // init iotivity namespace
             // register main index resource
             indexHandler = OcPlatform.registerResource(
-                    indexUri,
+                    baseUri,
                     RES_TYPE_INDEX,
                     OcPlatform.DEFAULT_INTERFACE,
                     indexEntityHandler,
@@ -82,6 +63,8 @@ class ResService(
     }
 
     fun stopService() {
+        // TODO: unregister all resources
+
         workingThread.quitSafely()
         workingThread.join()
     }
@@ -105,6 +88,27 @@ class ResService(
                 // Register to iotivity
                 f.registerResource()
             }
+        }
+    }
+
+    private fun handleRequest(request: OcResourceRequest): EntityHandlerResult {
+        val queryParameters = request.queryParameters
+        val command = queryParameters[PARAM_COMMAND]
+        if (command != null && command != COMMAND_INDEX) { // Optional command get_index
+            return EntityHandlerResult.FORBIDDEN
+        }
+
+        // TODO: Generate index data
+        // Send index
+        return try {
+            val rep = OcRepresentation()
+            rep.setValue(PARAM_COMMAND, COMMAND_INDEX)
+
+            request.sendResponse(rep)
+            EntityHandlerResult.OK
+        } catch (e: OcException) {
+            e.printStackTrace()
+            EntityHandlerResult.ERROR
         }
     }
 
@@ -161,7 +165,10 @@ class ResService(
 
     companion object {
         const val PARAM_COMMAND: String = "cmd"
+        const val PARAM_HASH: String = "hash"
         const val COMMAND_INDEX: String = "get_index"
+        const val COMMAND_HASH: String = "get_hash"
+        const val COMMAND_DATA: String = "get_data"
 
         const val RES_TYPE_INDEX: String = "res.index"
         const val RES_TYPE_DATA: String = "res.data"
@@ -183,4 +190,12 @@ class ResService(
             OcPlatform.Configure(cfg)
         }
     }
+}
+
+fun OcResourceRequest.sendResponse(representation: OcRepresentation) {
+    val response = OcResourceResponse()
+    response.setRequestHandle(requestHandle)
+    response.setResourceHandle(resourceHandle)
+    response.setResourceRepresentation(representation)
+    OcPlatform.sendResponse(response)
 }
