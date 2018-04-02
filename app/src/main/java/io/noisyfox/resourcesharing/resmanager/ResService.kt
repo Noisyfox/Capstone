@@ -1,10 +1,9 @@
 package io.noisyfox.resourcesharing.resmanager
 
-import android.app.Activity
+import android.content.Context
 import android.os.Handler
 import android.os.HandlerThread
 import io.noisyfox.libfilemanager.FileManager
-import io.noisyfox.libfilemanager.MarkedFile
 import io.noisyfox.libfilemanager.getSHA256HexString
 import org.iotivity.base.*
 import org.iotivity.ca.CaInterface
@@ -16,7 +15,10 @@ class ResService(
         val fileManager: FileManager
 ) {
 
-    private val namespaceHash = namespace.getSHA256HexString()
+    internal val namespaceHash = namespace.getSHA256HexString()
+    internal val baseUri = "/foxres/$namespaceHash"
+    private val indexUri = "$baseUri/index"
+
     private val workingThread = object : HandlerThread("Resource Service Main Thread") {
         override fun onLooperPrepared() {
 //            handler = Handler(looper)
@@ -24,7 +26,38 @@ class ResService(
     }
     private lateinit var handler: Handler
 
-    private val managedResources: MutableMap<String, MarkedFile> = mutableMapOf()
+    private val managedResources: MutableMap<String, ResContext> = mutableMapOf()
+    private var indexHandler: OcResourceHandle? = null
+    private val indexEntityHandler: OcPlatform.EntityHandler = OcPlatform.EntityHandler { request ->
+        when (request.requestType) {
+            RequestType.GET -> {
+                val queryParameters = request.queryParameters
+                val command = queryParameters[PARAM_COMMAND]
+                if (command == null || command != COMMAND_INDEX) {
+                    EntityHandlerResult.FORBIDDEN
+                } else {
+                    // TODO: Generate index data
+                    // Send index
+                    try {
+                        val rep = OcRepresentation()
+                        rep.setValue(PARAM_COMMAND, COMMAND_INDEX)
+
+                        val response = OcResourceResponse()
+                        response.setRequestHandle(request.requestHandle)
+                        response.setResourceHandle(request.resourceHandle)
+                        response.setResourceRepresentation(rep)
+                        OcPlatform.sendResponse(response)
+
+                        EntityHandlerResult.OK
+                    } catch (e: OcException) {
+                        e.printStackTrace()
+                        EntityHandlerResult.ERROR
+                    }
+                }
+            }
+            else -> EntityHandlerResult.FORBIDDEN
+        }
+    }
 
     val isAlive get() = workingThread.isAlive
 
@@ -33,6 +66,17 @@ class ResService(
 
         handler = Handler(workingThread.looper)
         runOnWorkingThread2 {
+
+            // init iotivity namespace
+            // register main index resource
+            indexHandler = OcPlatform.registerResource(
+                    indexUri,
+                    RES_TYPE_INDEX,
+                    OcPlatform.DEFAULT_INTERFACE,
+                    indexEntityHandler,
+                    EnumSet.of(ResourceProperty.DISCOVERABLE, ResourceProperty.OBSERVABLE)
+            )
+
             onInited?.invoke(this)
         }
     }
@@ -50,21 +94,18 @@ class ResService(
      */
     fun registerResource(fileId: String) {
         runOnWorkingThread2 {
-            val f = managedResources[fileId] ?: run<MarkedFile> {
-                val nf = fileManager.getFile(fileId)
+            val f = managedResources[fileId] ?: run<ResContext> {
+                val nf = ResContext(this, fileManager.getFile(fileId))
                 managedResources[fileId] = nf
                 nf
             }
 
             // Check if f is complete
-            if (f.isComplete()) {
+            if (f.file.isComplete()) {
                 // Register to iotivity
-                registerResource(f)
+                f.registerResource()
             }
         }
-    }
-
-    private fun registerResource(file: MarkedFile) {
     }
 
     fun runOnWorkingThread(action: () -> Unit): Unit = runOnWorkingThread2(action)
@@ -119,11 +160,16 @@ class ResService(
     )
 
     companion object {
-        fun initOcPlatform(activity: Activity) {
+        const val PARAM_COMMAND: String = "cmd"
+        const val COMMAND_INDEX: String = "get_index"
+
+        const val RES_TYPE_INDEX: String = "res.index"
+        const val RES_TYPE_DATA: String = "res.data"
+
+        fun initOcPlatform(context: Context) {
             CaInterface.setBTConfigure(2)
             val cfg = PlatformConfig(
-                    activity,
-                    activity.baseContext,
+                    context,
                     ServiceType.IN_PROC,
                     ModeType.CLIENT_SERVER,
                     "0.0.0.0",

@@ -25,6 +25,8 @@ class MainApplication : Application() {
         }
 
         fileManager = FileManager(File(filesDir, "files").absolutePath)
+
+        ResService.initOcPlatform(this)
         resourceService = ResService("io.noisyfox.resourcesharing", fileManager)
         resourceService.startService()
 
