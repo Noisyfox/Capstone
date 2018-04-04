@@ -61,6 +61,22 @@ class MarkedFileWriter(
     }
 
     @Synchronized
+    fun clearFile() = ensureOpen {
+        if (openedBlocks.isNotEmpty()) {
+            throw IllegalStateException("Must close all blocks first!")
+        }
+
+        // Clear status first
+        status = ProgressModel()
+        jacksonObjectMapper()
+                .enable(SerializationFeature.INDENT_OUTPUT)
+                .writeValue(file.statusFile, status)
+
+        // Delete the data file
+        file.dataFile.delete()
+    }
+
+    @Synchronized
     internal fun closeBlock(block: FileBlock) = ensureOpen {
         if (block.index !in openedBlocks) {
             throw IllegalStateException("Block not opened!")

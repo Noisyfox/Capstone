@@ -7,6 +7,8 @@ import io.noisyfox.libfilemanager.FileManager
 import io.noisyfox.libfilemanager.getSHA256HexString
 import org.iotivity.base.*
 import org.iotivity.ca.CaInterface
+import java.io.FileNotFoundException
+import java.io.IOException
 import java.util.*
 import java.util.concurrent.LinkedBlockingDeque
 
@@ -87,6 +89,26 @@ class ResService(
             if (f.file.isComplete()) {
                 // Register to iotivity
                 f.registerResource()
+            }
+        }
+    }
+
+    /**
+     * Delete the downloaded content.
+     *
+     * If the file is currently downloading, stop the download first.
+     */
+    fun clearResource(fileId: String) {
+        runOnWorkingThread2 {
+            val f = managedResources[fileId]
+                    ?: throw FileNotFoundException("File $fileId not registered!")
+
+            // TODO: stop downloading
+            // Lock the file for writing
+            val w = f.file.tryOpenWriter() ?: throw IOException("File still in use!")
+            w.use {
+                f.unregisterResource()
+                w.clearFile()
             }
         }
     }
