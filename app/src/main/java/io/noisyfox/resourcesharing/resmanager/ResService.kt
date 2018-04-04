@@ -19,6 +19,7 @@ class ResService(
 
     internal val namespaceHash = namespace.getSHA256HexString()
     internal val baseUri = "/foxres/$namespaceHash"
+    internal val baseInterface = "foxres.${namespaceHash.substring(0..16)}"
 
     private val workingThread = object : HandlerThread("Resource Service Main Thread") {
         override fun onLooperPrepared() {
@@ -55,7 +56,7 @@ class ResService(
             indexHandler = OcPlatform.registerResource(
                     baseUri,
                     RES_TYPE_INDEX,
-                    OcPlatform.DEFAULT_INTERFACE,
+                    baseInterface,
                     indexEntityHandler,
                     EnumSet.of(ResourceProperty.DISCOVERABLE, ResourceProperty.OBSERVABLE)
             )

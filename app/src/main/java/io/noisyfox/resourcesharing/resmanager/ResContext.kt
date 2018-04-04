@@ -9,7 +9,10 @@ internal class ResContext(
         service: ResService,
         val file: MarkedFile
 ) {
-    val baseUri: String = "${service.baseUri}/${file.metadata.name.getSHA256HexString()}"
+    private val baseHash = file.metadata.name.getSHA256HexString()
+    val baseUri: String = "${service.baseUri}/$baseHash}"
+    private val baseInterface = "${service.baseInterface}.${baseHash.substring(0..16)}"
+    private val dataInterface = "$baseInterface.data"
     private var indexHandler: OcResourceHandle? = null
     private var blockHandlers: List<OcResourceHandle>? = null
     private val entityHandler: OcPlatform.EntityHandler = OcPlatform.EntityHandler { request ->
@@ -38,7 +41,7 @@ internal class ResContext(
         val iH = OcPlatform.registerResource(
                 baseUri,
                 ResService.RES_TYPE_INDEX,
-                OcPlatform.DEFAULT_INTERFACE,
+                baseInterface,
                 entityHandler,
                 EnumSet.of(ResourceProperty.DISCOVERABLE, ResourceProperty.OBSERVABLE)
         )
@@ -48,7 +51,7 @@ internal class ResContext(
                 bHs.add(OcPlatform.registerResource(
                         "$baseUri/$i",
                         ResService.RES_TYPE_DATA,
-                        OcPlatform.DEFAULT_INTERFACE,
+                        dataInterface,
                         entityHandler,
                         EnumSet.of(ResourceProperty.DISCOVERABLE, ResourceProperty.OBSERVABLE)
                 ))
