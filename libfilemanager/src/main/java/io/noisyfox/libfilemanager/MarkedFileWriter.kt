@@ -83,6 +83,19 @@ class MarkedFileWriter(
         }
         openedBlocks.remove(block.index)
 
+        flushBlock2(block)
+    }
+
+    @Synchronized
+    internal fun flushBlock(block: FileBlock) = ensureOpen {
+        if (block.index !in openedBlocks) {
+            throw IllegalStateException("Block not opened!")
+        }
+
+        flushBlock2(block)
+    }
+
+    private fun flushBlock2(block: FileBlock) {
         val memory = block.memoryBlock
 
         // Flush file
@@ -163,6 +176,8 @@ class FileBlock(
     fun append(buffer: ByteArray): Unit = append(buffer, 0, buffer.size)
 
     fun append(buffer: ByteArray, offset: Int, len: Int): Unit = ensureOpen { memoryBlock.put(buffer, offset, len) }
+
+    fun flush() = writer.flushBlock(this)
 
     override fun close() {
         if (!closed) {
