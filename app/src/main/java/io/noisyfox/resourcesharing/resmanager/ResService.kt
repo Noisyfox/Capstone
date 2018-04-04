@@ -10,7 +10,9 @@ import org.iotivity.ca.CaInterface
 import java.io.FileNotFoundException
 import java.io.IOException
 import java.util.*
+import java.util.concurrent.BlockingQueue
 import java.util.concurrent.LinkedBlockingDeque
+import java.util.concurrent.TimeUnit
 
 class ResService(
         val namespace: String,
@@ -173,12 +175,16 @@ class ResService(
             throw IllegalStateException("Service not running!")
         }
 
-        val r = queue.take()
-        if (r.ex != null) {
-            throw r.ex
-        }
+        val result = queue.poll(workingThread)
+        if (result == null) {
+            throw IllegalStateException("Service not running!")
+        } else {
+            if (result.ex != null) {
+                throw result.ex
+            }
 
-        return r
+            return result
+        }
     }
 
     private data class AsyncState<out T>(
@@ -212,6 +218,15 @@ class ResService(
                     EnumSet.complementOf(EnumSet.of(OcConnectivityType.CT_ADAPTER_NFC))
             )
             OcPlatform.Configure(cfg)
+        }
+
+        private fun <R> BlockingQueue<R>.poll(workingThread: Thread): R? {
+            var result: R? = null
+            while (result == null && workingThread.isAlive) {
+                result = this.poll(100, TimeUnit.MILLISECONDS)
+            }
+
+            return result
         }
     }
 }
