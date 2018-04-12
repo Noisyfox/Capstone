@@ -14,6 +14,16 @@ import java.util.concurrent.BlockingQueue
 import java.util.concurrent.LinkedBlockingDeque
 import java.util.concurrent.TimeUnit
 
+interface ResDownloadListener {
+    fun onBlockDownloaded(service: ResService, fileId: String, block: Int)
+
+    fun onDownloadCompleted(service: ResService, fileId: String)
+
+    fun onDownloadFailed(service: ResService, fileId: String, ex: Throwable?)
+
+    fun onDownloadStopped(service: ResService, fileId: String)
+}
+
 class ResService(
         val namespace: String,
         val fileManager: FileManager
@@ -30,6 +40,7 @@ class ResService(
     }
     private lateinit var handler: Handler
 
+    val downloadListeners: MutableList<ResDownloadListener> = mutableListOf()
     private val managedResources: MutableMap<String, ResContext> = mutableMapOf()
     private var indexHandler: OcResourceHandle? = null
     private val indexEntityHandler: OcPlatform.EntityHandler = OcPlatform.EntityHandler { request ->
@@ -103,8 +114,7 @@ class ResService(
      */
     fun clearResource(fileId: String) {
         runOnWorkingThread2 {
-            val f = managedResources[fileId]
-                    ?: throw FileNotFoundException("File $fileId not registered!")
+            val f = getResContext(fileId)
 
             // TODO: stop downloading
             // Lock the file for writing
@@ -115,6 +125,23 @@ class ResService(
             }
         }
     }
+
+    fun startDownload(fileId: String) {
+        runOnWorkingThread2 {
+            val f = getResContext(fileId)
+
+            if (f.file.isComplete()) {
+                downloadListeners.safeForEach {
+                    it.onDownloadCompleted(this, fileId)
+                }
+            } else {
+                // TODO: check if is downloading
+            }
+        }
+    }
+
+    private fun getResContext(fileId: String): ResContext = managedResources[fileId]
+            ?: throw FileNotFoundException("File $fileId not registered!")
 
     private fun handleRequest(request: OcResourceRequest): EntityHandlerResult {
         val queryParameters = request.queryParameters

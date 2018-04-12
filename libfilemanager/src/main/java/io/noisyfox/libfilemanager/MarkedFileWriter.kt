@@ -9,7 +9,7 @@ import java.nio.channels.FileChannel
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
 class MarkedFileWriter(
-        private val file: MarkedFile,
+        val file: MarkedFile,
         private val lock: ReentrantReadWriteLock.WriteLock
 ) : Closeable {
     private var unlocked: Boolean = false
@@ -24,6 +24,11 @@ class MarkedFileWriter(
     val writableBlocks
         @Synchronized get() = ensureOpen {
             (0 until blockCount) - status.completedBlocks
+        }
+
+    val openableBlocks
+        @Synchronized get() = ensureOpen {
+            writableBlocks - openedBlocks
         }
 
     @Synchronized
@@ -152,7 +157,7 @@ class MarkedFileWriter(
 }
 
 class FileBlock(
-        private val writer: MarkedFileWriter,
+        val writer: MarkedFileWriter,
         val index: Int,
         val block: BlockModel,
         internal val memoryBlock: MappedByteBuffer
