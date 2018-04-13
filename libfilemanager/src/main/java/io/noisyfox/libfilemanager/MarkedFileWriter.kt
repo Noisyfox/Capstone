@@ -169,6 +169,8 @@ class FileBlock(
         get() = ensureOpen { memoryBlock.position() }
         private set(value) = ensureOpen { memoryBlock.position(value) }
 
+    val remain: Int
+        get() = block.size - currentPointer
 
     fun seekBack(newPointer: Int) {
         if (newPointer > currentPointer) {
