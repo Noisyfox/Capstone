@@ -7,6 +7,7 @@ import java.io.*
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
 class MarkedFile(
+        val id: String,
         fileLock: ReentrantReadWriteLock,
         manager: FileManager,
         hash: String,

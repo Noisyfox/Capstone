@@ -17,6 +17,8 @@ import java.util.concurrent.TimeUnit
 interface ResDownloadListener {
     fun onBlockDownloaded(service: ResService, fileId: String, block: Int)
 
+    fun onBlockDownloadFailed(service: ResService, fileId: String, block: Int, ex: Throwable?)
+
     fun onDownloadCompleted(service: ResService, fileId: String)
 
     fun onDownloadFailed(service: ResService, fileId: String, ex: Throwable?)
@@ -116,7 +118,9 @@ class ResService(
         runOnWorkingThread2 {
             val f = getResContext(fileId)
 
-            // TODO: stop downloading
+            // stop downloading
+            f.downloader.stop()
+
             // Lock the file for writing
             val w = f.file.tryOpenWriter() ?: throw IOException("File still in use!")
             w.use {
@@ -135,7 +139,7 @@ class ResService(
                     it.onDownloadCompleted(this, fileId)
                 }
             } else {
-                // TODO: check if is downloading
+                f.downloader.start()
             }
         }
     }
@@ -161,6 +165,12 @@ class ResService(
         } catch (e: OcException) {
             e.printStackTrace()
             EntityHandlerResult.ERROR
+        }
+    }
+
+    internal fun assertOnWorkingThread() {
+        if (Thread.currentThread() != workingThread) {
+            throw IllegalStateException("Must be called on ResService working thread!")
         }
     }
 

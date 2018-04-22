@@ -23,7 +23,7 @@ class FileManager(internal val baseDir: String) {
         val metadata = jacksonObjectMapper().readValue<MetadataModel>(File(baseDir, "$h.meta.json"))
 
         val lock = fileLocks.getOrPut(h) { ReentrantReadWriteLock() }
-        return MarkedFile(lock, this, h, metadata)
+        return MarkedFile(fileId, lock, this, h, metadata)
     }
 
     companion object {

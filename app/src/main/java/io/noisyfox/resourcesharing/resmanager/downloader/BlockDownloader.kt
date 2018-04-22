@@ -15,7 +15,5 @@ internal interface BlockDownloader {
 internal interface BlockDownloaderListener {
     fun onBlockDownloaded(downloader: BlockDownloader, block: Int)
 
-    fun onDownloadCompleted(downloader: BlockDownloader)
-
     fun onBlockDownloadFailed(downloader: BlockDownloader, block: Int, ex: Throwable?)
 }

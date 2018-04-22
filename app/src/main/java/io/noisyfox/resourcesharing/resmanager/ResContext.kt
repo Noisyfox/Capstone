@@ -2,13 +2,16 @@ package io.noisyfox.resourcesharing.resmanager
 
 import io.noisyfox.libfilemanager.MarkedFile
 import io.noisyfox.libfilemanager.getSHA256HexString
+import io.noisyfox.resourcesharing.resmanager.downloader.MainDownloader
 import org.iotivity.base.*
 import java.util.*
 
 internal class ResContext(
-        service: ResService,
+        internal val service: ResService,
         val file: MarkedFile
 ) {
+    internal val downloader: MainDownloader = MainDownloader(this)
+
     private val baseHash = file.metadata.name.getSHA256HexString()
     val baseUri: String = "${service.baseUri}/$baseHash}"
     private val baseInterface = "${service.baseInterface}.${baseHash.substring(0..16)}"
