@@ -40,6 +40,9 @@ class MainFragment : Fragment(), ResDownloadListener, Logging.LoggingListener {
         btn_smart_download.setOnClickListener {
 
         }
+        btn_stop.setOnClickListener {
+            service.stopDownload(MainApplication.TEST_FILE_1)
+        }
         btn_clear_cache.setOnClickListener {
             service.clearResource(MainApplication.TEST_FILE_1)
         }

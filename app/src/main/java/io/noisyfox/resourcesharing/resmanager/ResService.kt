@@ -144,6 +144,13 @@ class ResService(
         }
     }
 
+    fun stopDownload(fileId: String) {
+        runOnWorkingThread2 {
+            val f = getResContext(fileId)
+            f.downloader.stop()
+        }
+    }
+
     private fun getResContext(fileId: String): ResContext = managedResources[fileId]
             ?: throw FileNotFoundException("File $fileId not registered!")
 

@@ -17,23 +17,40 @@
         app:layout_constraintRight_toRightOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <Button
-        android:id="@+id/btn_direct_download"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Direct download" />
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
 
-    <Button
-        android:id="@+id/btn_smart_download"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Smart Download" />
+        <Button
+            android:id="@+id/btn_direct_download"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Direct download" />
 
-    <Button
-        android:id="@+id/btn_clear_cache"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Clear Cache" />
+        <Button
+            android:id="@+id/btn_smart_download"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Smart Download" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <Button
+            android:id="@+id/btn_stop"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Stop Download" />
+
+        <Button
+            android:id="@+id/btn_clear_cache"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Clear Cache" />
+
+    </LinearLayout>
 
     <ScrollView
         android:id="@+id/logScroll"
@@ -51,5 +68,17 @@
             android:textAppearance="@style/TextAppearance.AppCompat.Small"
             tools:text="Log" />
     </ScrollView>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="right">
+
+        <Button
+            android:id="@+id/btn_clear_log"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Clear Log" />
+    </LinearLayout>
 
 </LinearLayout>
