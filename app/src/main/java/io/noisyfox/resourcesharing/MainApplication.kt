@@ -5,13 +5,20 @@ import android.content.res.Resources
 import android.util.TypedValue
 import io.noisyfox.libfilemanager.FileManager
 import io.noisyfox.resourcesharing.resmanager.ResService
+import org.slf4j.impl.HandroidLoggerAdapter
 import java.io.File
 import java.io.FileOutputStream
 
 class MainApplication : Application() {
 
+    init {
+        HandroidLoggerAdapter.DEBUG = BuildConfig.DEBUG
+        HandroidLoggerAdapter.APP_NAME = "Resource Sharing"
+    }
+
     override fun onCreate() {
         super.onCreate()
+        Logging.init()
 
         // Init data directory
         val dir = File(filesDir, "files")
@@ -30,10 +37,12 @@ class MainApplication : Application() {
         resourceService = ResService("io.noisyfox.resourcesharing", fileManager)
         resourceService.startService()
 
-        resourceService.registerResource("100MB.zip")
+        resourceService.registerResource(TEST_FILE_1)
     }
 
     companion object {
+        const val TEST_FILE_1 = "100MB.zip"
+
         lateinit var fileManager: FileManager
             private set
 

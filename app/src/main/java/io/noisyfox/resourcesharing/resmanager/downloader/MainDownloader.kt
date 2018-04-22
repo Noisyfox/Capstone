@@ -29,6 +29,7 @@ internal class MainDownloader(
 
         // Pure http download
         val d = HttpBlockDownloader(file.metadata.url, w)
+        d.downloadListeners += this
         blockDownloaders.add(d)
         d.start()
         d.assignBlocks(HashSet(w.openableBlocks))

@@ -5,8 +5,8 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:layout_margin="10dp"
-    tools:context="io.noisyfox.resourcesharing.MainFragment"
-    android:orientation="vertical">
+    android:orientation="vertical"
+    tools:context="io.noisyfox.resourcesharing.MainFragment">
 
     <TextView
         android:layout_width="match_parent"
@@ -21,18 +21,35 @@
         android:id="@+id/btn_direct_download"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Direct download"/>
+        android:text="Direct download" />
 
     <Button
         android:id="@+id/btn_smart_download"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Smart Download"/>
+        android:text="Smart Download" />
 
     <Button
         android:id="@+id/btn_clear_cache"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Clear Cache"/>
+        android:text="Clear Cache" />
+
+    <ScrollView
+        android:id="@+id/logScroll"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
+
+        <TextView
+            android:id="@+id/logText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="top|left"
+            android:singleLine="false"
+            android:textAppearance="@style/TextAppearance.AppCompat.Small"
+            tools:text="Log" />
+    </ScrollView>
 
 </LinearLayout>

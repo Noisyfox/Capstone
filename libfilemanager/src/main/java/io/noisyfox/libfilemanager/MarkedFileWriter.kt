@@ -197,7 +197,7 @@ class FileBlock(
     }
 
     private inline fun <R> ensureOpen(action: () -> R): R {
-        if (!closed) {
+        if (closed) {
             throw IllegalStateException("Already closed!")
         }
 
