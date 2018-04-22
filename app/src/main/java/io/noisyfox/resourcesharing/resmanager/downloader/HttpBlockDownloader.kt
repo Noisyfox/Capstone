@@ -74,6 +74,7 @@ internal class HttpBlockDownloader(
                     try {
                         currentBlock = fileWriter.openBlock(nextBlock)
                     } catch (e: Exception) {
+                        e.printStackTrace()
                         if (finishBlock(nextBlock)) {
                             downloadListeners.safeForEach {
                                 it.onBlockDownloadFailed(this, nextBlock, e)
@@ -205,6 +206,7 @@ internal class HttpBlockDownloader(
                 } catch (e: InterruptedException) {
                     throw e
                 } catch (e: Exception) {
+                    e.printStackTrace()
                     currentBlock.safeClose()
                     val id = currentBlock.index
                     currentBlock = null
@@ -245,17 +247,21 @@ internal class HttpBlockDownloader(
 
     override fun stop() {
         val t: Thread? = synchronized(threadLock) {
-            httpSession?.safeClose()
+            httpSession?.cancel()
             httpSession = null
 
             val t = workingThread
             workingThread = null
-            t?.interrupt()
 
             t
         }
 
-        t?.join()
+        t?.let {
+            while (t.isAlive) {
+                t.interrupt()
+                t.join(100)
+            }
+        }
     }
 
     override fun assignBlocks(blocks: Set<Int>) {
@@ -298,6 +304,15 @@ private class HttpSession(private val httpCall: Call) : Closeable {
         }
 
         return r
+    }
+
+    fun cancel() {
+        synchronized(threadLock) {
+            if (closed) {
+                return
+            }
+            httpCall.cancel()
+        }
     }
 
     override fun close() {
