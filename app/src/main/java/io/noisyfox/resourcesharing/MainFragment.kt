@@ -75,6 +75,10 @@ class MainFragment : Fragment(), ResDownloadListener, Logging.LoggingListener {
         }
     }
 
+    override fun onDownloadStarted(service: ResService, fileId: String) {
+        logger.info("Download started for file $fileId.")
+    }
+
     override fun onBlockDownloaded(service: ResService, fileId: String, block: Int) {
         logger.info("Block $block download completed for file $fileId.")
     }

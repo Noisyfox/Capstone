@@ -24,23 +24,28 @@ internal class HttpBlockDownloader(
     override val downloadListeners: MutableList<BlockDownloaderListener> = mutableListOf()
 
     private val httpClient = OkHttpClient()
+
     private val threadLock = java.lang.Object()
-
-    private var httpSession: HttpSession? = null
+    private var requestToStop = false
     private var workingThread: Thread? = null
-    private val assignedBlocks: PriorityQueue<Int> = PriorityQueue()
-    private val workingRunnable = Runnable {
-        val thread = Thread.currentThread()
+    private var httpSession: HttpSession? = null
 
+    private val assignedBlocks: PriorityQueue<Int> = PriorityQueue()
+
+    private val workingRunnable = Runnable {
         var currentBlock: FileBlock? = null
+
         var currentHttpSession: HttpSession? = null
-        var currentHttpInputStream: InputStream? = null
         var currentInputIndex = 0L
 
         val buffer = ByteArray(1024)
 
         try {
-            while (!thread.isInterrupted) {
+            downloadListeners.safeForEach {
+                it.onBlockDownloaderStarted(this)
+            }
+
+            while (!requestToStop) {
                 if (currentBlock != null) {
                     // Clean up current job and start next
                     currentBlock.safeClose()
@@ -67,7 +72,9 @@ internal class HttpBlockDownloader(
                         // Close stream if already opened
                         currentHttpSession?.safeClose()
                         currentHttpSession = null
-                        currentHttpInputStream = null
+                        synchronized(threadLock) {
+                            httpSession = null
+                        }
                         continue
                     }
                     // Open block for writing
@@ -86,13 +93,13 @@ internal class HttpBlockDownloader(
 
                 // Work with current block
                 try {
-                    blockLoop@ while (!thread.isInterrupted) {
+                    blockLoop@ while (!requestToStop) {
                         // Current write position in the entire file
                         val blockAbsOffset: Long = currentBlock.writer.file.metadata.getBlockOffset(currentBlock.index) + currentBlock.currentPointer
                         // Check current stream
                         if (currentHttpSession == null) {
                             currentHttpSession = synchronized(threadLock) {
-                                if (thread.isInterrupted) {
+                                if (requestToStop) {
                                     throw InterruptedException("Stopped")
                                 }
 
@@ -118,7 +125,7 @@ internal class HttpBlockDownloader(
 
                             // Check success
                             val code = res.code()
-                            var isSuccess =
+                            val isSuccess =
                                     when {
                                         !res.isSuccessful -> false
                                         blockAbsOffset == 0L -> true
@@ -129,19 +136,9 @@ internal class HttpBlockDownloader(
                                         }
                                         else -> false
                                     }
-                            if (isSuccess) {
-                                // Try open stream
-                                try {
-                                    currentHttpInputStream = res.body()!!.byteStream()
-                                } catch (e: Exception) {
-                                    e.printStackTrace()
-                                    isSuccess = false
-                                }
-                            }
                             if (!isSuccess) {
                                 currentHttpSession.safeClose()
                                 currentHttpSession = null
-                                currentHttpInputStream = null
                                 throw IOException("Http request failed!")
                             } else {
                                 currentInputIndex = blockAbsOffset
@@ -150,16 +147,15 @@ internal class HttpBlockDownloader(
                             if (currentInputIndex != blockAbsOffset) {
                                 currentHttpSession.safeClose()
                                 currentHttpSession = null
-                                currentHttpInputStream = null
                                 continue
                             }
                         }
 
                         // Start real download
                         var blockCheckTime = 0
-                        while (!thread.isInterrupted) {
+                        while (!requestToStop && currentHttpSession != null) {
                             // Check if current block is still assigned
-                            if (blockCheckTime++ > 5) {
+                            if (blockCheckTime++ > 10) {
                                 val id = currentBlock.index
                                 val valid = synchronized(threadLock) {
                                     id in assignedBlocks
@@ -186,17 +182,15 @@ internal class HttpBlockDownloader(
 
                             val requiredSize = min(remain, buffer.size)
                             val readSize = try {
-                                currentHttpInputStream!!.read(buffer, 0, requiredSize)
+                                currentHttpSession.read(buffer, 0, requiredSize)
                             } catch (e: Exception) {
-                                currentHttpSession!!.safeClose()
+                                currentHttpSession.safeClose()
                                 currentHttpSession = null
-                                currentHttpInputStream = null
                                 throw e
                             }
                             if (readSize == -1) {
-                                currentHttpSession!!.safeClose()
+                                currentHttpSession.safeClose()
                                 currentHttpSession = null
-                                currentHttpInputStream = null
                                 throw IOException("Unexpected EOF!")
                             }
                             currentInputIndex += readSize
@@ -223,6 +217,15 @@ internal class HttpBlockDownloader(
         } finally {
             currentBlock?.safeClose()
             currentHttpSession?.safeClose()
+
+            synchronized(threadLock) {
+                requestToStop = false
+                workingThread = null
+                httpSession = null
+            }
+            downloadListeners.safeForEach {
+                it.onBlockDownloaderStopped(this)
+            }
         }
     }
 
@@ -233,34 +236,32 @@ internal class HttpBlockDownloader(
         } else false
     }
 
-    override fun start() {
+    override fun start(): Boolean {
         synchronized(threadLock) {
+            if (requestToStop) {
+                throw IllegalStateException("Previous session quiting!")
+            }
+
             val t = workingThread
             if (t != null && t.isAlive) {
-                return
+                return true
             }
             workingThread = thread(start = true, name = "HttpBlockDownloader working thread") {
                 workingRunnable.run()
             }
+            return false
         }
     }
 
-    override fun stop() {
-        val t: Thread? = synchronized(threadLock) {
+    override fun stop(): Boolean {
+        synchronized(threadLock) {
+            val t = workingThread ?: return true
+
+            requestToStop = true
             httpSession?.cancel()
-            httpSession = null
+//            t.interrupt()
 
-            val t = workingThread
-            workingThread = null
-
-            t
-        }
-
-        t?.let {
-            while (t.isAlive) {
-                t.interrupt()
-                t.join(100)
-            }
+            return false
         }
     }
 
@@ -283,6 +284,7 @@ internal class HttpBlockDownloader(
 }
 
 private class HttpSession(private val httpCall: Call) : Closeable {
+    private var inputStream: InputStream? = null
     private val threadLock = java.lang.Object()
     private var response: Response? = null
     private var closed = false
@@ -306,6 +308,24 @@ private class HttpSession(private val httpCall: Call) : Closeable {
         return r
     }
 
+    fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+        var input = inputStream
+        if (input == null) {
+            input = synchronized<InputStream>(threadLock) {
+                val i = inputStream
+                if (i == null) {
+                    val resp = response ?: throw IOException("Response not fetched!")
+                    val i2 = resp.body()!!.byteStream()
+                    inputStream = i2
+                    i2
+                } else {
+                    i
+                }
+            }
+        }
+        return input.read(buffer, offset, length)
+    }
+
     fun cancel() {
         synchronized(threadLock) {
             if (closed) {
@@ -325,6 +345,7 @@ private class HttpSession(private val httpCall: Call) : Closeable {
             httpCall.cancel()
             response?.safeClose()
             response = null
+            inputStream = null
         }
     }
 }

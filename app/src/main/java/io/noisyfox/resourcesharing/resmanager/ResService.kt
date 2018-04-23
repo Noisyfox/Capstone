@@ -15,6 +15,8 @@ import java.util.concurrent.LinkedBlockingDeque
 import java.util.concurrent.TimeUnit
 
 interface ResDownloadListener {
+    fun onDownloadStarted(service: ResService, fileId: String)
+
     fun onBlockDownloaded(service: ResService, fileId: String, block: Int)
 
     fun onBlockDownloadFailed(service: ResService, fileId: String, block: Int, ex: Throwable?)
@@ -116,10 +118,10 @@ class ResService(
      */
     fun clearResource(fileId: String) {
         runOnWorkingThread2 {
-            val f = getResContext(fileId)
-
             // stop downloading
-            f.downloader.stop()
+            stopDownload(fileId)
+
+            val f = getResContext(fileId)
 
             // Lock the file for writing
             val w = f.file.tryOpenWriter() ?: throw IOException("File still in use!")
