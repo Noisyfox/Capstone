@@ -278,6 +278,7 @@ class ResService(
         const val PARAM_COMMAND: String = "cmd"
         const val PARAM_HASH: String = "hash"
         const val PARAM_DATA: String = "data"
+        const val PARAM_BLOCK: String = "block"
         const val COMMAND_INDEX: String = "get_index"
         const val COMMAND_HASH: String = "get_hash"
         const val COMMAND_DATA: String = "get_data"

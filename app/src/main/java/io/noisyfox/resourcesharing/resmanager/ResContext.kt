@@ -20,11 +20,12 @@ internal class ResContext(
     internal val downloader: MainDownloader = MainDownloader(this)
 
     private val baseHash = file.metadata.name.getSHA256HexString()
-    val baseUri: String = "${service.baseUri}/$baseHash}"
+    private val baseUri: String = "${service.baseUri}/$baseHash"
+    private val dataUri: String = "$baseUri/data"
     private val baseInterface = "${service.baseInterface}.${baseHash.substring(0..16)}"
     private val dataInterface = "$baseInterface.data"
     private var indexHandler: OcResourceHandle? = null
-    private var blockHandlers: List<OcResourceHandle>? = null
+    private var dataHandler: OcResourceHandle? = null
     private val entityHandler: OcPlatform.EntityHandler = OcPlatform.EntityHandler { request ->
         val uri = request.resourceUri
         if (!uri.startsWith(baseUri)) {
@@ -33,10 +34,10 @@ internal class ResContext(
 
         when (request.requestType) {
             RequestType.GET -> {
-                if (uri == baseUri) {
-                    handleIndex(request)
-                } else {
-                    handleData(request)
+                when (uri) {
+                    baseUri -> handleIndex(request)
+                    dataUri -> handleData(request)
+                    else -> EntityHandlerResult.FORBIDDEN
                 }
             }
             else -> EntityHandlerResult.FORBIDDEN
@@ -75,32 +76,28 @@ internal class ResContext(
                 entityHandler,
                 EnumSet.of(ResourceProperty.DISCOVERABLE, ResourceProperty.OBSERVABLE)
         )
-        val bHs = mutableListOf<OcResourceHandle>()
-        for (i in 0 until file.metadata.blocks.size) {
+        val dh = try {
+            OcPlatform.registerResource(
+                    dataUri,
+                    ResService.RES_TYPE_DATA,
+                    dataInterface,
+                    entityHandler,
+                    EnumSet.of(ResourceProperty.DISCOVERABLE, ResourceProperty.OBSERVABLE)
+            )
+        } catch (e: OcException) {
+            e.printStackTrace()
             try {
-                bHs.add(OcPlatform.registerResource(
-                        "$baseUri/$i",
-                        ResService.RES_TYPE_DATA,
-                        dataInterface,
-                        entityHandler,
-                        EnumSet.of(ResourceProperty.DISCOVERABLE, ResourceProperty.OBSERVABLE)
-                ))
+                OcPlatform.unregisterResource(iH)
             } catch (e: OcException) {
                 e.printStackTrace()
-                bHs.add(iH)
-                bHs.forEach {
-                    try {
-                        OcPlatform.unregisterResource(it)
-                    } catch (e: OcException) {
-                        e.printStackTrace()
-                    }
-                }
-                throw e
             }
+
+            throw e
         }
 
+
         indexHandler = iH
-        blockHandlers = bHs
+        dataHandler = dh
 
         logger.debug("Start sharing file ${file.id}")
     }
@@ -112,7 +109,7 @@ internal class ResContext(
             return
         }
 
-        val handlers = blockHandlers!! + indexHandler!!
+        val handlers = listOf(dataHandler!!, indexHandler!!)
         handlers.forEach {
             try {
                 OcPlatform.unregisterResource(it)
@@ -122,7 +119,7 @@ internal class ResContext(
         }
 
         indexHandler = null
-        blockHandlers = null
+        dataHandler = null
 
         logger.debug("Stop sharing file ${file.id}")
     }
@@ -200,29 +197,27 @@ internal class ResContext(
                 }
                 else -> EntityHandlerResult.FORBIDDEN
             }
-        } catch (e: OcException) {
+        } catch (e: Exception) {
             e.printStackTrace()
             EntityHandlerResult.ERROR
         }
     }
 
     private fun handleData(request: OcResourceRequest): EntityHandlerResult {
-        val uri = request.resourceUri
+        val queryParameters = request.queryParameters
 
-        // Parse uri
-        if (!uri.startsWith("$baseUri/")) {
-            return EntityHandlerResult.FORBIDDEN
-        }
-        val block = try {
-            uri.substring(baseUri.length + 1).toInt()
-        } catch (e: NumberFormatException) {
-            return EntityHandlerResult.FORBIDDEN
-        }
+        val block = queryParameters[ResService.PARAM_BLOCK]?.let {
+            try {
+                it.toInt()
+            } catch (e: NumberFormatException) {
+                null
+            }
+        } ?: return EntityHandlerResult.ERROR
+
         if (block < 0 || block >= file.metadata.blocks.count()) {
             return EntityHandlerResult.FORBIDDEN
         }
 
-        val queryParameters = request.queryParameters
         val command = queryParameters[ResService.PARAM_COMMAND]
 
         return try {
@@ -247,7 +242,7 @@ internal class ResContext(
                 }
                 else -> EntityHandlerResult.FORBIDDEN
             }
-        } catch (e: OcException) {
+        } catch (e: Exception) {
             e.printStackTrace()
             EntityHandlerResult.ERROR
         }
