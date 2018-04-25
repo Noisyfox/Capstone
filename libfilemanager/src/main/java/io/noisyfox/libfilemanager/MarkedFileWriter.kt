@@ -100,11 +100,13 @@ class MarkedFileWriter(
         flushBlock2(block)
     }
 
-    private fun flushBlock2(block: FileBlock) {
+    private fun flushBlock2(block: FileBlock): ProgressStatus {
         val memory = block.memoryBlock
 
         // Flush file
         memory.force()
+
+        var blockStatus = ProgressStatus.Downloading
 
         // Update and write progress file
         val progress = block.currentPointer
@@ -112,12 +114,16 @@ class MarkedFileWriter(
             // Check hash
             val hash = memory.getSHA256HexString()
             if (hash == block.block.hash) {
+                blockStatus = ProgressStatus.Completed
+
                 status = status.withBlockComplete(block.index)
                 // Check if all completed
                 if (((0 until blockCount) - status.completedBlocks).isEmpty()) {
                     status = status.withAllComplete()
                 }
             } else {
+                blockStatus = ProgressStatus.HashMismatch
+
                 status = status.withStatus(block.index, BlockProgressModel(progress, ProgressStatus.HashMismatch))
             }
         } else {
@@ -126,6 +132,8 @@ class MarkedFileWriter(
         jacksonObjectMapper()
                 .enable(SerializationFeature.INDENT_OUTPUT)
                 .writeValue(file.statusFile, status)
+
+        return blockStatus
     }
 
     @Synchronized

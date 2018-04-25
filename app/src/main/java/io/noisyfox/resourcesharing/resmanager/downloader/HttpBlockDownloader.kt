@@ -2,6 +2,7 @@ package io.noisyfox.resourcesharing.resmanager.downloader
 
 import io.noisyfox.libfilemanager.FileBlock
 import io.noisyfox.libfilemanager.MarkedFileWriter
+import io.noisyfox.libfilemanager.ProgressStatus
 import io.noisyfox.resourcesharing.resmanager.safeClose
 import io.noisyfox.resourcesharing.resmanager.safeForEach
 import okhttp3.Call
@@ -169,12 +170,23 @@ internal class HttpBlockDownloader(
                             val remain = currentBlock.remain
                             if (remain <= 0) {
                                 // Block download finished
+                                val status = currentBlock.flush()
                                 currentBlock.close()
                                 val id = currentBlock.index
 
                                 if (finishBlock(id)) {
-                                    downloadListeners.safeForEach {
-                                        it.onBlockDownloaded(this, id)
+                                    if (status == ProgressStatus.Completed) {
+                                        downloadListeners.safeForEach {
+                                            it.onBlockDownloaded(this, id)
+                                        }
+                                    } else {
+                                        val err = when (status) {
+                                            ProgressStatus.HashMismatch -> HashMismatchException()
+                                            else -> BlockDownloadException("Unknown error!")
+                                        }
+                                        downloadListeners.safeForEach {
+                                            it.onBlockDownloadFailed(this, id, err)
+                                        }
                                     }
                                 }
                                 break@blockLoop

@@ -1,5 +1,7 @@
 package io.noisyfox.resourcesharing.resmanager.downloader
 
+import java.io.IOException
+
 internal interface BlockDownloader {
     val downloadListeners: MutableList<BlockDownloaderListener>
 
@@ -30,3 +32,9 @@ internal interface BlockDownloaderListener {
 
     fun onBlockDownloaderStopped(downloader: BlockDownloader)
 }
+
+internal open class BlockDownloadException(
+        msg: String
+) : IOException(msg)
+
+internal class HashMismatchException : BlockDownloadException("Hash mismatch!")

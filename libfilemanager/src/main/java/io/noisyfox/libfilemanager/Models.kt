@@ -80,7 +80,8 @@ data class ProgressModel(
 enum class ProgressStatus {
     Downloading,
     HashMismatch,
-    Failure
+    Failure,
+    Completed
 }
 
 data class BlockProgressModel(
