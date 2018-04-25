@@ -114,7 +114,7 @@ class MarkedFileWriter(
             if (hash == block.block.hash) {
                 status = status.withBlockComplete(block.index)
                 // Check if all completed
-                if (((0 until blockCount) - status.completed).isEmpty()) {
+                if (((0 until blockCount) - status.completedBlocks).isEmpty()) {
                     status = status.withAllComplete()
                 }
             } else {
