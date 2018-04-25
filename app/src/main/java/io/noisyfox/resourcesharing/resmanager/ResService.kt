@@ -7,6 +7,7 @@ import io.noisyfox.libfilemanager.FileManager
 import io.noisyfox.libfilemanager.getSHA256HexString
 import org.iotivity.base.*
 import org.iotivity.ca.CaInterface
+import org.slf4j.LoggerFactory
 import java.io.FileNotFoundException
 import java.io.IOException
 import java.util.*
@@ -14,6 +15,9 @@ import java.util.concurrent.BlockingQueue
 import java.util.concurrent.LinkedBlockingDeque
 import java.util.concurrent.TimeUnit
 
+/**
+ * All callbacks will be called from Resource Service Main Thread
+ */
 interface ResDownloadListener {
     fun onDownloadStarted(service: ResService, fileId: String)
 
@@ -31,8 +35,7 @@ interface ResDownloadListener {
 class ResService(
         val namespace: String,
         val fileManager: FileManager
-) {
-
+) : ResDownloadListener {
     internal val namespaceHash = namespace.getSHA256HexString()
     internal val baseUri = "/foxres/$namespaceHash"
     internal val baseInterface = "foxres.${namespaceHash.substring(0..16)}"
@@ -44,7 +47,7 @@ class ResService(
     }
     private lateinit var handler: Handler
 
-    val downloadListeners: MutableList<ResDownloadListener> = mutableListOf()
+    val downloadListeners: MutableList<ResDownloadListener> = mutableListOf(this)
     private val managedResources: MutableMap<String, ResContext> = mutableMapOf()
     private var indexHandler: OcResourceHandle? = null
     private val indexEntityHandler: OcPlatform.EntityHandler = OcPlatform.EntityHandler { request ->
@@ -103,32 +106,31 @@ class ResService(
                 ResContext(this, fileManager.getFile(fileId))
             }
 
-            // Check if f is complete
-            if (f.file.isComplete()) {
-                // Register to iotivity
-                f.registerResource()
-            }
+            // Register to iotivity
+            f.registerResource()
+        }
+    }
+
+    fun setResourceSharing(fileId: String, sharing: Boolean) {
+        runOnWorkingThread2 {
+            val f = getResContext(fileId)
+
+            f.isResourceSharing = sharing
         }
     }
 
     /**
      * Delete the downloaded content.
      *
-     * If the file is currently downloading, stop the download first.
+     * @throws IllegalStateException if the file is currently downloading.
+     * @throws IOException if the file is currently in use
      */
+    @Throws(IOException::class)
     fun clearResource(fileId: String) {
         runOnWorkingThread2 {
-            // stop downloading
-            stopDownload(fileId)
-
             val f = getResContext(fileId)
 
-            // Lock the file for writing
-            val w = f.file.tryOpenWriter() ?: throw IOException("File still in use!")
-            w.use {
-                f.unregisterResource()
-                w.clearFile()
-            }
+            f.clearResource()
         }
     }
 
@@ -136,20 +138,15 @@ class ResService(
         runOnWorkingThread2 {
             val f = getResContext(fileId)
 
-            if (f.file.isComplete()) {
-                downloadListeners.safeForEach {
-                    it.onDownloadCompleted(this, fileId)
-                }
-            } else {
-                f.downloader.start()
-            }
+            f.startDownload()
         }
     }
 
     fun stopDownload(fileId: String) {
         runOnWorkingThread2 {
             val f = getResContext(fileId)
-            f.downloader.stop()
+
+            f.stopDownload()
         }
     }
 
@@ -238,7 +235,46 @@ class ResService(
             val ex: Throwable? = null
     )
 
+
+    override fun onDownloadStarted(service: ResService, fileId: String) {
+        service.assertOnWorkingThread()
+        logger.info("Download started for file $fileId.")
+    }
+
+    override fun onBlockDownloaded(service: ResService, fileId: String, block: Int) {
+        service.assertOnWorkingThread()
+        val f = getResContext(fileId)
+        logger.info("Block $block/${f.file.metadata.blocks.size - 1} download completed for file $fileId.")
+    }
+
+    override fun onBlockDownloadFailed(service: ResService, fileId: String, block: Int, ex: Throwable?) {
+        service.assertOnWorkingThread()
+        val f = getResContext(fileId)
+        logger.info("Block $block/${f.file.metadata.blocks.size - 1} download failed for file $fileId.", ex)
+    }
+
+    override fun onDownloadCompleted(service: ResService, fileId: String) {
+        service.assertOnWorkingThread()
+        logger.info("Download completed for file $fileId.")
+    }
+
+    override fun onDownloadFailed(service: ResService, fileId: String, ex: Throwable?) {
+        service.assertOnWorkingThread()
+        logger.info("Download failed for file $fileId.", ex)
+    }
+
+    override fun onDownloadStopped(service: ResService, fileId: String) {
+        service.assertOnWorkingThread()
+        logger.info("Download stopped for file $fileId.")
+
+        val f = getResContext(fileId)
+        // Register to iotivity
+        f.registerResource()
+    }
+
     companion object {
+        private val logger = LoggerFactory.getLogger(ResService::class.java)
+
         const val PARAM_COMMAND: String = "cmd"
         const val PARAM_HASH: String = "hash"
         const val PARAM_DATA: String = "data"

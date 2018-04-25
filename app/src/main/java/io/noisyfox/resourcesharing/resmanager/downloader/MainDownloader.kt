@@ -113,6 +113,12 @@ internal class MainDownloader(
         }
     }
 
+    internal fun isStopped(): Boolean {
+        service.assertOnWorkingThread()
+
+        return currentStatus == Status.Stopped
+    }
+
     override fun onBlockDownloaderStarted(downloader: BlockDownloader) {
         service.runOnWorkingThread {
             if (downloader !in blockDownloaderEden) {
@@ -154,12 +160,18 @@ internal class MainDownloader(
                 when (currentStatus) {
                     Status.Stopping -> {
                         currentStatus = Status.Stopped
+                        fileWriter?.safeClose()
+                        fileWriter = null
+
                         listeners.safeForEach {
                             it.onDownloadStopped(service, file.id)
                         }
                     }
                     Status.StartAfterStopped -> {
                         currentStatus = Status.Stopped
+                        fileWriter?.safeClose()
+                        fileWriter = null
+
                         if (start()) {
                             listeners.safeForEach {
                                 it.onDownloadStarted(service, file.id)
@@ -183,6 +195,8 @@ internal class MainDownloader(
                 listeners.safeForEach {
                     it.onDownloadCompleted(service, file.id)
                 }
+
+                stop()
             }
         }
     }

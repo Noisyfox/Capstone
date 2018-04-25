@@ -35,16 +35,22 @@ class MainFragment : Fragment(), ResDownloadListener, Logging.LoggingListener {
         val service = MainApplication.resourceService
 
         btn_direct_download.setOnClickListener {
-            service.startDownload(MainApplication.TEST_FILE_1)
+            logException {
+                service.startDownload(MainApplication.TEST_FILE_1)
+            }
         }
         btn_smart_download.setOnClickListener {
 
         }
         btn_stop.setOnClickListener {
-            service.stopDownload(MainApplication.TEST_FILE_1)
+            logException {
+                service.stopDownload(MainApplication.TEST_FILE_1)
+            }
         }
         btn_clear_cache.setOnClickListener {
-            service.clearResource(MainApplication.TEST_FILE_1)
+            logException {
+                service.clearResource(MainApplication.TEST_FILE_1)
+            }
         }
     }
 
@@ -76,27 +82,33 @@ class MainFragment : Fragment(), ResDownloadListener, Logging.LoggingListener {
     }
 
     override fun onDownloadStarted(service: ResService, fileId: String) {
-        logger.info("Download started for file $fileId.")
+        activity.runOnUiThread {
+            btn_stop.isEnabled = true
+            btn_clear_cache.isEnabled = false
+            btn_smart_download.isEnabled = false
+            btn_direct_download.isEnabled = false
+        }
     }
 
     override fun onBlockDownloaded(service: ResService, fileId: String, block: Int) {
-        logger.info("Block $block download completed for file $fileId.")
     }
 
     override fun onBlockDownloadFailed(service: ResService, fileId: String, block: Int, ex: Throwable?) {
-        logger.info("Block $block download failed for file $fileId.", ex)
     }
 
     override fun onDownloadCompleted(service: ResService, fileId: String) {
-        logger.info("Download completed for file $fileId.")
     }
 
     override fun onDownloadFailed(service: ResService, fileId: String, ex: Throwable?) {
-        logger.info("Download failed for file $fileId.", ex)
     }
 
     override fun onDownloadStopped(service: ResService, fileId: String) {
-        logger.info("Download stopped for file $fileId.")
+        activity.runOnUiThread {
+            btn_stop.isEnabled = false
+            btn_clear_cache.isEnabled = true
+            btn_smart_download.isEnabled = true
+            btn_direct_download.isEnabled = true
+        }
     }
 
     companion object {
@@ -104,5 +116,13 @@ class MainFragment : Fragment(), ResDownloadListener, Logging.LoggingListener {
 
         @JvmStatic
         fun newInstance() = MainFragment()
+
+        private inline fun logException(action: () -> Unit) {
+            try {
+                action()
+            } catch (e: Exception) {
+                logger.error("", e)
+            }
+        }
     }
 }

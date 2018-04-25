@@ -4,12 +4,19 @@ import io.noisyfox.libfilemanager.MarkedFile
 import io.noisyfox.libfilemanager.getSHA256HexString
 import io.noisyfox.resourcesharing.resmanager.downloader.MainDownloader
 import org.iotivity.base.*
+import org.slf4j.LoggerFactory
+import java.io.Closeable
+import java.io.IOException
 import java.util.*
 
+/**
+ * Any call to this class must on service's main thread!
+ */
 internal class ResContext(
         internal val service: ResService,
         val file: MarkedFile
-) {
+) : Closeable {
+
     internal val downloader: MainDownloader = MainDownloader(this)
 
     private val baseHash = file.metadata.name.getSHA256HexString()
@@ -36,7 +43,27 @@ internal class ResContext(
         }
     }
 
+    private var _sharing = true
+    var isResourceSharing
+        get() = _sharing
+        set(value) {
+            service.assertOnWorkingThread()
+
+            _sharing = value
+            if (_sharing) {
+                registerResource()
+            } else {
+                unregisterResource()
+            }
+        }
+
     fun registerResource() {
+        service.assertOnWorkingThread()
+
+        if (!file.isComplete() || !_sharing) {
+            return
+        }
+
         if (indexHandler != null) {
             return
         }
@@ -74,9 +101,13 @@ internal class ResContext(
 
         indexHandler = iH
         blockHandlers = bHs
+
+        logger.debug("Start sharing file ${file.id}")
     }
 
     fun unregisterResource() {
+        service.assertOnWorkingThread()
+
         if (indexHandler == null) {
             return
         }
@@ -92,6 +123,61 @@ internal class ResContext(
 
         indexHandler = null
         blockHandlers = null
+
+        logger.debug("Stop sharing file ${file.id}")
+    }
+
+    @Throws(IOException::class)
+    fun clearResource() {
+        service.assertOnWorkingThread()
+
+        if (!downloader.isStopped()) {
+            throw IllegalStateException("Downloader still running!")
+        }
+
+        unregisterResource()
+        val w = file.tryOpenWriter() ?: throw IOException("File still in use!")
+        w.use {
+            w.clearFile()
+        }
+    }
+
+    fun startDownload() {
+        service.assertOnWorkingThread()
+
+        if (!file.isComplete()) {
+            if (downloader.start()) {
+                service.postOnWorkingThread {
+                    service.downloadListeners.safeForEach {
+                        it.onDownloadStarted(service, file.id)
+                    }
+                }
+            }
+        } else {
+            service.postOnWorkingThread {
+                service.downloadListeners.safeForEach {
+                    it.onDownloadStarted(service, file.id)
+                }
+                service.downloadListeners.safeForEach {
+                    it.onDownloadCompleted(service, file.id)
+                }
+                service.downloadListeners.safeForEach {
+                    it.onDownloadStopped(service, file.id)
+                }
+            }
+        }
+    }
+
+    fun stopDownload() {
+        service.assertOnWorkingThread()
+
+        if (downloader.stop()) {
+            service.postOnWorkingThread {
+                service.downloadListeners.safeForEach {
+                    it.onDownloadStopped(service, file.id)
+                }
+            }
+        }
     }
 
     private fun handleIndex(request: OcResourceRequest): EntityHandlerResult {
@@ -165,5 +251,15 @@ internal class ResContext(
             e.printStackTrace()
             EntityHandlerResult.ERROR
         }
+    }
+
+    override fun close() {
+        service.assertOnWorkingThread()
+
+        downloader.close()
+    }
+
+    companion object {
+        private val logger = LoggerFactory.getLogger(ResContext::class.java)
     }
 }
