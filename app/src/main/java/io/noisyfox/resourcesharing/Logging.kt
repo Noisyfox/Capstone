@@ -8,6 +8,8 @@ class Logging {
 
     interface LoggingListener {
         fun onLog(message: String)
+
+        fun onLogClear()
     }
 
     companion object {
@@ -26,6 +28,13 @@ class Logging {
             messages.add(l)
             listeners.safeForEach {
                 it.onLog(l)
+            }
+        }
+
+        fun clear() {
+            messages.clear()
+            listeners.safeForEach {
+                it.onLogClear()
             }
         }
 

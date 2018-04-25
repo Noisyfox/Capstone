@@ -52,6 +52,11 @@ class MainFragment : Fragment(), ResDownloadListener, Logging.LoggingListener {
                 service.clearResource(MainApplication.TEST_FILE_1)
             }
         }
+        btn_clear_log.setOnClickListener {
+            logException {
+                Logging.clear()
+            }
+        }
     }
 
     override fun onResume() {
@@ -78,6 +83,12 @@ class MainFragment : Fragment(), ResDownloadListener, Logging.LoggingListener {
         activity.runOnUiThread {
             logText.append("$message\n")
             logScroll.fullScroll(View.FOCUS_DOWN)
+        }
+    }
+
+    override fun onLogClear() {
+        activity.runOnUiThread {
+            logText.text = ""
         }
     }
 
