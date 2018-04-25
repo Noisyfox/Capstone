@@ -284,7 +284,7 @@ class ResService(
         const val COMMAND_DATA: String = "get_data"
 
         const val RES_TYPE_INDEX: String = "res.index"
-        const val RES_TYPE_DATA: String = "res.data"
+        const val RES_TYPE_FILE: String = "res.file"
 
         fun initOcPlatform(context: Context) {
             CaInterface.setBTConfigure(2)

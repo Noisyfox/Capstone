@@ -21,11 +21,8 @@ internal class ResContext(
 
     private val baseHash = file.metadata.name.getSHA256HexString()
     private val baseUri: String = "${service.baseUri}/$baseHash"
-    private val dataUri: String = "$baseUri/data"
     private val baseInterface = "${service.baseInterface}.${baseHash.substring(0..16)}"
-    private val dataInterface = "$baseInterface.data"
-    private var indexHandler: OcResourceHandle? = null
-    private var dataHandler: OcResourceHandle? = null
+    private var fileHandler: OcResourceHandle? = null
     private val entityHandler: OcPlatform.EntityHandler = OcPlatform.EntityHandler { request ->
         val uri = request.resourceUri
         if (!uri.startsWith(baseUri)) {
@@ -35,8 +32,16 @@ internal class ResContext(
         when (request.requestType) {
             RequestType.GET -> {
                 when (uri) {
-                    baseUri -> handleIndex(request)
-                    dataUri -> handleData(request)
+                    baseUri -> {
+                        val queryParameters = request.queryParameters
+                        val block = queryParameters[ResService.PARAM_BLOCK]
+
+                        if (block == null) {
+                            handleIndex(request)
+                        } else {
+                            handleData(request)
+                        }
+                    }
                     else -> EntityHandlerResult.FORBIDDEN
                 }
             }
@@ -65,39 +70,19 @@ internal class ResContext(
             return
         }
 
-        if (indexHandler != null) {
+        if (fileHandler != null) {
             return
         }
 
-        val iH = OcPlatform.registerResource(
+        val fH = OcPlatform.registerResource(
                 baseUri,
-                ResService.RES_TYPE_INDEX,
+                ResService.RES_TYPE_FILE,
                 baseInterface,
                 entityHandler,
                 EnumSet.of(ResourceProperty.DISCOVERABLE, ResourceProperty.OBSERVABLE)
         )
-        val dh = try {
-            OcPlatform.registerResource(
-                    dataUri,
-                    ResService.RES_TYPE_DATA,
-                    dataInterface,
-                    entityHandler,
-                    EnumSet.of(ResourceProperty.DISCOVERABLE, ResourceProperty.OBSERVABLE)
-            )
-        } catch (e: OcException) {
-            e.printStackTrace()
-            try {
-                OcPlatform.unregisterResource(iH)
-            } catch (e: OcException) {
-                e.printStackTrace()
-            }
 
-            throw e
-        }
-
-
-        indexHandler = iH
-        dataHandler = dh
+        fileHandler = fH
 
         logger.debug("Start sharing file ${file.id}")
     }
@@ -105,21 +90,17 @@ internal class ResContext(
     fun unregisterResource() {
         service.assertOnWorkingThread()
 
-        if (indexHandler == null) {
+        if (fileHandler == null) {
             return
         }
 
-        val handlers = listOf(dataHandler!!, indexHandler!!)
-        handlers.forEach {
-            try {
-                OcPlatform.unregisterResource(it)
-            } catch (e: OcException) {
-                e.printStackTrace()
-            }
+        try {
+            OcPlatform.unregisterResource(fileHandler)
+        } catch (e: OcException) {
+            e.printStackTrace()
         }
 
-        indexHandler = null
-        dataHandler = null
+        fileHandler = null
 
         logger.debug("Stop sharing file ${file.id}")
     }
