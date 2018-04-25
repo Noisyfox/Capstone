@@ -39,7 +39,7 @@ internal class ResContext(
                         if (block == null) {
                             handleIndex(request)
                         } else {
-                            handleData(request)
+                            handleBlock(block, request)
                         }
                     }
                     else -> EntityHandlerResult.FORBIDDEN
@@ -184,27 +184,24 @@ internal class ResContext(
         }
     }
 
-    private fun handleData(request: OcResourceRequest): EntityHandlerResult {
-        val queryParameters = request.queryParameters
-
-        val block = queryParameters[ResService.PARAM_BLOCK]?.let {
-            try {
-                it.toInt()
-            } catch (e: NumberFormatException) {
-                null
-            }
+    private fun handleBlock(block: String, request: OcResourceRequest): EntityHandlerResult {
+        val b = try {
+            block.toInt()
+        } catch (e: NumberFormatException) {
+            null
         } ?: return EntityHandlerResult.ERROR
 
-        if (block < 0 || block >= file.metadata.blocks.count()) {
+        if (b < 0 || b >= file.metadata.blocks.count()) {
             return EntityHandlerResult.FORBIDDEN
         }
 
+        val queryParameters = request.queryParameters
         val command = queryParameters[ResService.PARAM_COMMAND]
 
         return try {
             when (command) {
                 null, ResService.COMMAND_DATA -> {
-                    val data = file.readBlock(block)
+                    val data = file.readBlock(b)
 
                     val rep = OcRepresentation()
                     rep.setValue(ResService.PARAM_COMMAND, ResService.COMMAND_DATA)
@@ -216,7 +213,7 @@ internal class ResContext(
                 ResService.COMMAND_HASH -> {
                     val rep = OcRepresentation()
                     rep.setValue(ResService.PARAM_COMMAND, ResService.COMMAND_HASH)
-                    rep.setValue(ResService.PARAM_HASH, file.metadata.blocks[block].hash)
+                    rep.setValue(ResService.PARAM_HASH, file.metadata.blocks[b].hash)
 
                     request.sendResponse(rep)
                     EntityHandlerResult.OK
