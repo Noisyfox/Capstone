@@ -63,7 +63,6 @@ internal class MainDownloader(
                 val d = HttpBlockDownloader(file.metadata.url, w)
                 if (hatchNewDownloader(d)) {
                     d.downloadListeners += this
-                    blockDownloaderEden.add(d)
                     d.assignBlocks(HashSet(w.openableBlocks))
                 }
 
@@ -121,11 +120,18 @@ internal class MainDownloader(
         service.assertOnWorkingThread()
 
         return when (currentStatus) {
-            Status.Starting, Status.Running -> {
+            Status.Starting -> {
                 blockDownloaderEden.add(downloader)
                 if (downloader.start()) {
                     blockDownloaderEden.remove(downloader)
                     blockDownloaders.add(downloader)
+                }
+                true
+            }
+            Status.Running -> {
+                blockDownloaderEden.add(downloader)
+                if (downloader.start()) {
+                    onBlockDownloaderStarted(downloader)
                 }
                 true
             }
@@ -170,9 +176,7 @@ internal class MainDownloader(
                 Status.Stopping, Status.StartAfterStopped -> {
                     // Oops! God told us to stop
                     if (downloader.stop()) {
-                        service.postOnWorkingThread {
-                            onBlockDownloaderStopped(downloader)
-                        }
+                        onBlockDownloaderStopped(downloader)
                     }
                 }
                 Status.Stopped -> {
