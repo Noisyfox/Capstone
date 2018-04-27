@@ -9,7 +9,7 @@ import org.slf4j.LoggerFactory
 import java.io.Closeable
 
 internal class MainDownloader(
-    private val resContext: ResContext
+        private val resContext: ResContext
 ) : BlockDownloaderListener, Closeable {
 
     private enum class Status {
@@ -53,7 +53,7 @@ internal class MainDownloader(
                 }
 
                 val w = file.tryOpenWriter()
-                    ?: throw IllegalStateException("Unable to open writer!")
+                        ?: throw IllegalStateException("Unable to open writer!")
 
                 fileWriter = w
 
@@ -255,7 +255,11 @@ internal class MainDownloader(
                     it.onDownloadCompleted(service, file.id)
                 }
 
-                stop()
+                if (stop()) {
+                    listeners.safeForEach {
+                        it.onDownloadStopped(service, file.id)
+                    }
+                }
             }
         }
     }
