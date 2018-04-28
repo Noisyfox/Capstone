@@ -134,11 +134,11 @@ class ResService(
         }
     }
 
-    fun startDownload(fileId: String) {
+    fun startDownload(fileId: String, enableResourceFinder: Boolean = true) {
         runOnWorkingThread2 {
             val f = getResContext(fileId)
 
-            f.startDownload()
+            f.startDownload(enableResourceFinder)
         }
     }
 

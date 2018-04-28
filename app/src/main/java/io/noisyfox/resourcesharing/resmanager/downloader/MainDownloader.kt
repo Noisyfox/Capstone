@@ -4,13 +4,14 @@ import io.noisyfox.libfilemanager.MarkedFileWriter
 import io.noisyfox.resourcesharing.resmanager.ResContext
 import io.noisyfox.resourcesharing.resmanager.safeClose
 import io.noisyfox.resourcesharing.resmanager.safeForEach
+import org.iotivity.base.OcResource
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.Closeable
 
 internal class MainDownloader(
-        private val resContext: ResContext
-) : BlockDownloaderListener, Closeable {
+        internal val resContext: ResContext
+) : BlockDownloaderListener, ResourceFindListener, Closeable {
 
     private enum class Status {
         Starting,
@@ -27,10 +28,22 @@ internal class MainDownloader(
 
     private var fileWriter: MarkedFileWriter? = null
 
-    private val blockDownloaderEden = mutableListOf<BlockDownloader>()
-    private val blockDownloaders = mutableListOf<BlockDownloader>()
+    private val componentEden = mutableListOf<DownloaderComponent>()
+    private val components = mutableListOf<DownloaderComponent>()
 
     private var currentStatus: Status = Status.Stopped
+
+    private var _useResDiscovery = true
+    internal var isResourceDiscoveryEnabled: Boolean
+        get() = _useResDiscovery
+        set(value) {
+            service.assertOnWorkingThread()
+
+            when (currentStatus) {
+                Status.Stopped -> _useResDiscovery = value
+                else -> throw IllegalStateException("Can't change during download!")
+            }
+        }
 
     internal fun start(): Boolean {
         service.assertOnWorkingThread()
@@ -48,8 +61,8 @@ internal class MainDownloader(
             Status.Running -> true
             Status.Starting -> false
             Status.Stopped -> {
-                if (blockDownloaders.isNotEmpty()) {
-                    throw IllegalStateException("blockDownloaders not empty! Fetal error!")
+                if (components.isNotEmpty()) {
+                    throw IllegalStateException("Components not empty! Fetal error!")
                 }
 
                 val w = file.tryOpenWriter()
@@ -66,7 +79,12 @@ internal class MainDownloader(
                     d.assignBlocks(HashSet(w.openableBlocks))
                 }
 
-                if (blockDownloaderEden.isEmpty()) {
+                if (isResourceDiscoveryEnabled) {
+                    val finder = ResFinder(this)
+                    hatchNewDownloader(finder)
+                }
+
+                if (componentEden.isEmpty()) {
                     currentStatus = Status.Running
                     true
                 } else {
@@ -92,12 +110,12 @@ internal class MainDownloader(
             }
             Status.StopAfterStarted -> false
             Status.Running -> {
-                blockDownloaders.safeForEach {
+                components.safeForEach {
                     if (it.stop()) {
-                        blockDownloaders.remove(it)
+                        components.remove(it)
                     }
                 }
-                if (blockDownloaderEden.isEmpty() && blockDownloaders.isEmpty()) {
+                if (componentEden.isEmpty() && components.isEmpty()) {
                     currentStatus = Status.Stopped
                     fileWriter?.safeClose()
                     fileWriter = null
@@ -116,22 +134,22 @@ internal class MainDownloader(
         return currentStatus == Status.Stopped
     }
 
-    private fun hatchNewDownloader(downloader: BlockDownloader): Boolean {
+    private fun hatchNewDownloader(downloader: DownloaderComponent): Boolean {
         service.assertOnWorkingThread()
 
         return when (currentStatus) {
             Status.Starting -> {
-                blockDownloaderEden.add(downloader)
+                componentEden.add(downloader)
                 if (downloader.start()) {
-                    blockDownloaderEden.remove(downloader)
-                    blockDownloaders.add(downloader)
+                    componentEden.remove(downloader)
+                    components.add(downloader)
                 }
                 true
             }
             Status.Running -> {
-                blockDownloaderEden.add(downloader)
+                componentEden.add(downloader)
                 if (downloader.start()) {
-                    onBlockDownloaderStarted(downloader)
+                    onComponentStarted(downloader)
                 }
                 true
             }
@@ -142,17 +160,17 @@ internal class MainDownloader(
         }
     }
 
-    override fun onBlockDownloaderStarted(downloader: BlockDownloader) {
+    override fun onComponentStarted(component: DownloaderComponent) {
         service.runOnWorkingThread {
-            if (downloader !in blockDownloaderEden) {
+            if (component !in componentEden) {
                 throw IllegalStateException("Downloader not in Eden!")
             }
-            blockDownloaderEden.remove(downloader)
-            blockDownloaders.add(downloader)
+            componentEden.remove(component)
+            components.add(component)
 
             when (currentStatus) {
                 Status.Starting -> {
-                    if (blockDownloaderEden.isEmpty()) {
+                    if (componentEden.isEmpty()) {
                         currentStatus = Status.Running
                         listeners.safeForEach {
                             it.onDownloadStarted(service, file.id)
@@ -160,7 +178,7 @@ internal class MainDownloader(
                     }
                 }
                 Status.StopAfterStarted -> {
-                    if (blockDownloaderEden.isEmpty()) {
+                    if (componentEden.isEmpty()) {
                         currentStatus = Status.Running
 
                         if (stop()) {
@@ -175,16 +193,16 @@ internal class MainDownloader(
                 }
                 Status.Stopping, Status.StartAfterStopped -> {
                     // Oops! God told us to stop
-                    if (downloader.stop()) {
-                        onBlockDownloaderStopped(downloader)
+                    if (component.stop()) {
+                        onComponentStopped(component)
                     }
                 }
                 Status.Stopped -> {
                     // Something goes wrong!
                     logger.error("Child downloader started after main downloader stopped! Not good!")
-                    if (downloader.stop()) {
+                    if (component.stop()) {
                         service.postOnWorkingThread {
-                            onBlockDownloaderStopped(downloader)
+                            onComponentStopped(component)
                         }
                     }
                 }
@@ -192,14 +210,14 @@ internal class MainDownloader(
         }
     }
 
-    override fun onBlockDownloaderStopped(downloader: BlockDownloader) {
+    override fun onComponentStopped(component: DownloaderComponent) {
         service.runOnWorkingThread {
-            when (downloader) {
-                in blockDownloaderEden -> {
+            when (component) {
+                in componentEden -> {
                     logger.warn("Child downloader died in Eden!")
-                    blockDownloaderEden.remove(downloader)
+                    componentEden.remove(component)
                 }
-                in blockDownloaders -> blockDownloaders.remove(downloader)
+                in components -> components.remove(component)
                 else -> throw IllegalStateException("Downloader not in list!")
             }
 
@@ -212,7 +230,7 @@ internal class MainDownloader(
                     // Ignored
                 }
                 Status.Stopping -> {
-                    if (blockDownloaderEden.isEmpty() && blockDownloaders.isEmpty()) {
+                    if (componentEden.isEmpty() && components.isEmpty()) {
                         currentStatus = Status.Stopped
                         fileWriter?.safeClose()
                         fileWriter = null
@@ -223,7 +241,7 @@ internal class MainDownloader(
                     }
                 }
                 Status.StartAfterStopped -> {
-                    if (blockDownloaderEden.isEmpty() && blockDownloaders.isEmpty()) {
+                    if (componentEden.isEmpty() && components.isEmpty()) {
                         currentStatus = Status.Stopped
                         fileWriter?.safeClose()
                         fileWriter = null
@@ -272,6 +290,14 @@ internal class MainDownloader(
 
             // TODO: retry for X times or failed!
         }
+    }
+
+    override fun onResourceFound(r: OcResource) {
+        logger.debug("Resource found: ${r.host}${r.uri}")
+    }
+
+    override fun onResourceLost(r: OcResource) {
+        logger.debug("Resource lost: ${r.host}${r.uri}")
     }
 
     override fun close() {

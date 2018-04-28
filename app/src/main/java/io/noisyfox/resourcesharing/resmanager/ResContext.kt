@@ -21,7 +21,7 @@ internal class ResContext(
 
     private val baseHash = file.metadata.name.getSHA256HexString()
     private val baseUri: String = "${service.baseUri}/$baseHash"
-    private val baseInterface = "${service.baseInterface}.${baseHash.substring(0..16)}"
+    internal val baseInterface = "${service.baseInterface}.${baseHash.substring(0..16)}"
     private var fileHandler: OcResourceHandle? = null
     private val entityHandler: OcPlatform.EntityHandler = OcPlatform.EntityHandler { request ->
         val uri = request.resourceUri
@@ -120,10 +120,11 @@ internal class ResContext(
         }
     }
 
-    fun startDownload() {
+    fun startDownload(enableResourceFinder: Boolean) {
         service.assertOnWorkingThread()
 
         if (!file.isComplete()) {
+            downloader.isResourceDiscoveryEnabled = enableResourceFinder
             if (downloader.start()) {
                 service.postOnWorkingThread {
                     service.downloadListeners.safeForEach {

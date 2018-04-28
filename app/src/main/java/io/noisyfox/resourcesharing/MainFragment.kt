@@ -36,11 +36,13 @@ class MainFragment : Fragment(), ResDownloadListener, Logging.LoggingListener {
 
         btn_direct_download.setOnClickListener {
             logException {
-                service.startDownload(MainApplication.TEST_FILE_1)
+                service.startDownload(MainApplication.TEST_FILE_1, false)
             }
         }
         btn_smart_download.setOnClickListener {
-
+            logException {
+                service.startDownload(MainApplication.TEST_FILE_1, true)
+            }
         }
         btn_stop.setOnClickListener {
             logException {

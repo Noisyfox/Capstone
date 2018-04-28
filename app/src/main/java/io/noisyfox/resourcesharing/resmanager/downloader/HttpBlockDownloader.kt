@@ -43,7 +43,7 @@ internal class HttpBlockDownloader(
 
         try {
             downloadListeners.safeForEach {
-                it.onBlockDownloaderStarted(this)
+                it.onComponentStarted(this)
             }
 
             while (!requestToStop) {
@@ -236,7 +236,7 @@ internal class HttpBlockDownloader(
                 httpSession = null
             }
             downloadListeners.safeForEach {
-                it.onBlockDownloaderStopped(this)
+                it.onComponentStopped(this)
             }
         }
     }
@@ -271,6 +271,7 @@ internal class HttpBlockDownloader(
 
             requestToStop = true
             httpSession?.cancel()
+            threadLock.notifyAll()
 //            t.interrupt()
 
             return false

@@ -2,9 +2,7 @@ package io.noisyfox.resourcesharing.resmanager.downloader
 
 import java.io.IOException
 
-internal interface BlockDownloader {
-    val downloadListeners: MutableList<BlockDownloaderListener>
-
+internal interface DownloaderComponent {
     /**
      * @return True if already started, false otherwise.
      */
@@ -14,6 +12,19 @@ internal interface BlockDownloader {
      * @return True if already stopped, false otherwise.
      */
     fun stop(): Boolean
+}
+
+/**
+ * All callbacks will be called from block downloader's own working thread
+ */
+internal interface DownloaderComponentListener {
+    fun onComponentStarted(component: DownloaderComponent)
+
+    fun onComponentStopped(component: DownloaderComponent)
+}
+
+internal interface BlockDownloader : DownloaderComponent {
+    val downloadListeners: MutableList<BlockDownloaderListener>
 
     fun assignBlocks(blocks: Set<Int>)
 
@@ -23,14 +34,10 @@ internal interface BlockDownloader {
 /**
  * All callbacks will be called from block downloader's own working thread
  */
-internal interface BlockDownloaderListener {
-    fun onBlockDownloaderStarted(downloader: BlockDownloader)
-
+internal interface BlockDownloaderListener : DownloaderComponentListener {
     fun onBlockDownloaded(downloader: BlockDownloader, block: Int)
 
     fun onBlockDownloadFailed(downloader: BlockDownloader, block: Int, ex: Throwable?)
-
-    fun onBlockDownloaderStopped(downloader: BlockDownloader)
 }
 
 internal open class BlockDownloadException(
