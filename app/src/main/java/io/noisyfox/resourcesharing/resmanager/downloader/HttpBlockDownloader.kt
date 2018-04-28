@@ -19,6 +19,7 @@ import kotlin.math.min
 
 
 internal class HttpBlockDownloader(
+        override val id: Long,
         private val url: String,
         private val fileWriter: MarkedFileWriter
 ) : BlockDownloader {
@@ -54,6 +55,10 @@ internal class HttpBlockDownloader(
                     continue
                 } else {
                     val nextBlock: Int = synchronized(threadLock) {
+                        if (requestToStop) {
+                            return@synchronized -1
+                        }
+
                         if (assignedBlocks.isEmpty()) {
                             if (currentHttpSession == null) {
                                 // No stream opened, wait forever
@@ -93,6 +98,7 @@ internal class HttpBlockDownloader(
                 }
 
                 // Work with current block
+                val id = currentBlock.index
                 try {
                     blockLoop@ while (!requestToStop) {
                         // Current write position in the entire file
@@ -157,7 +163,6 @@ internal class HttpBlockDownloader(
                         while (!requestToStop && currentHttpSession != null) {
                             // Check if current block is still assigned
                             if (blockCheckTime++ > 10) {
-                                val id = currentBlock.index
                                 val valid = synchronized(threadLock) {
                                     id in assignedBlocks
                                 }
@@ -172,7 +177,6 @@ internal class HttpBlockDownloader(
                                 // Block download finished
                                 val status = currentBlock.flush()
                                 currentBlock.close()
-                                val id = currentBlock.index
 
                                 if (finishBlock(id)) {
                                     if (status == ProgressStatus.Completed) {
@@ -214,7 +218,6 @@ internal class HttpBlockDownloader(
                 } catch (e: Exception) {
                     e.printStackTrace()
                     currentBlock.safeClose()
-                    val id = currentBlock.index
                     currentBlock = null
 
                     if (finishBlock(id)) {

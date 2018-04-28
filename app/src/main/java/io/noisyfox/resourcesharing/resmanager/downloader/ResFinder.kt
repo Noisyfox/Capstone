@@ -23,7 +23,6 @@ internal class ResFinder(
 
     private val resourceDiscovered = mutableMapOf<OcResourceIdentifier, ResourceHolder>()
     private val workingRunnable = Runnable {
-
         try {
             downloader.onComponentStarted(this)
 
@@ -31,9 +30,10 @@ internal class ResFinder(
                 OcPlatform.findResource(
                         "",
                         "${OcPlatform.WELL_KNOWN_QUERY}?rt=${ResService.RES_TYPE_FILE}&if=${downloader.resContext.baseInterface}",
-                        EnumSet.complementOf(EnumSet.of(OcConnectivityType.CT_ADAPTER_NFC, OcConnectivityType.CT_FLAG_SECURE)),
+//                        EnumSet.complementOf(EnumSet.of(OcConnectivityType.CT_ADAPTER_NFC, OcConnectivityType.CT_FLAG_SECURE)),
+                        EnumSet.of(OcConnectivityType.CT_ADAPTER_IP),
                         this,
-                        QualityOfService.MEDIUM
+                        QualityOfService.HIGH
                 )
 
                 // Check outdated resource
@@ -104,6 +104,11 @@ internal class ResFinder(
             if (r == null) {
                 val n = ResourceHolder(p0)
                 resourceDiscovered[p0.uniqueIdentifier] = n
+
+                p0.allHosts.first { it.startsWith("coap+tcp") }?.let {
+                    p0.host = it
+                }
+
                 n
             } else {
                 r.foundAgain()

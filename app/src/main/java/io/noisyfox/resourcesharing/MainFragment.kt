@@ -36,12 +36,17 @@ class MainFragment : Fragment(), ResDownloadListener, Logging.LoggingListener {
 
         btn_direct_download.setOnClickListener {
             logException {
-                service.startDownload(MainApplication.TEST_FILE_1, false)
+                service.startDownload(MainApplication.TEST_FILE_1, true, false)
+            }
+        }
+        btn_res_only_download.setOnClickListener {
+            logException {
+                service.startDownload(MainApplication.TEST_FILE_1, false, true)
             }
         }
         btn_smart_download.setOnClickListener {
             logException {
-                service.startDownload(MainApplication.TEST_FILE_1, true)
+                service.startDownload(MainApplication.TEST_FILE_1, true, true)
             }
         }
         btn_stop.setOnClickListener {
@@ -100,6 +105,7 @@ class MainFragment : Fragment(), ResDownloadListener, Logging.LoggingListener {
             btn_clear_cache.isEnabled = false
             btn_smart_download.isEnabled = false
             btn_direct_download.isEnabled = false
+            btn_res_only_download.isEnabled = false
         }
     }
 
@@ -121,6 +127,7 @@ class MainFragment : Fragment(), ResDownloadListener, Logging.LoggingListener {
             btn_clear_cache.isEnabled = true
             btn_smart_download.isEnabled = true
             btn_direct_download.isEnabled = true
+            btn_res_only_download.isEnabled = true
         }
     }
 

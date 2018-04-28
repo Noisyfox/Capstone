@@ -134,11 +134,14 @@ class ResService(
         }
     }
 
-    fun startDownload(fileId: String, enableResourceFinder: Boolean = true) {
+    fun startDownload(fileId: String, enableHttp: Boolean = true, enableResourceFinder: Boolean = true) {
+        if (!enableHttp && !enableResourceFinder) {
+            throw IllegalArgumentException("Must enable at least one of http download/resource finder!")
+        }
         runOnWorkingThread2 {
             val f = getResContext(fileId)
 
-            f.startDownload(enableResourceFinder)
+            f.startDownload(enableHttp, enableResourceFinder)
         }
     }
 
@@ -243,14 +246,14 @@ class ResService(
 
     override fun onBlockDownloaded(service: ResService, fileId: String, block: Int) {
         service.assertOnWorkingThread()
-        val f = getResContext(fileId)
-        logger.info("Block $block/${f.file.metadata.blocks.size - 1} download completed for file $fileId.")
+//        val f = getResContext(fileId)
+//        logger.info("Block $block/${f.file.metadata.blocks.size - 1} download completed for file $fileId.")
     }
 
     override fun onBlockDownloadFailed(service: ResService, fileId: String, block: Int, ex: Throwable?) {
         service.assertOnWorkingThread()
-        val f = getResContext(fileId)
-        logger.info("Block $block/${f.file.metadata.blocks.size - 1} download failed for file $fileId.", ex)
+//        val f = getResContext(fileId)
+//        logger.info("Block $block/${f.file.metadata.blocks.size - 1} download failed for file $fileId.", ex)
     }
 
     override fun onDownloadCompleted(service: ResService, fileId: String) {
@@ -279,6 +282,7 @@ class ResService(
         const val PARAM_HASH: String = "hash"
         const val PARAM_DATA: String = "data"
         const val PARAM_BLOCK: String = "block"
+        const val PARAM_RANGE: String = "range"
         const val COMMAND_INDEX: String = "get_index"
         const val COMMAND_HASH: String = "get_hash"
         const val COMMAND_DATA: String = "get_data"
@@ -294,11 +298,11 @@ class ResService(
                     ModeType.CLIENT_SERVER,
                     "0.0.0.0",
                     0,
-                    QualityOfService.MEDIUM
+                    QualityOfService.HIGH
             )
             cfg.setAvailableTransportType(
                     // Don't support NFC
-                    EnumSet.complementOf(EnumSet.of(OcConnectivityType.CT_ADAPTER_NFC))
+                    EnumSet.complementOf(EnumSet.of(OcConnectivityType.CT_ADAPTER_NFC, OcConnectivityType.CT_FLAG_SECURE))
             )
             OcPlatform.Configure(cfg)
         }

@@ -34,13 +34,19 @@ class MarkedFile(
         }
     }
 
-    fun readBlock(block: Int): ByteArray {
+    fun readBlock(block: Int): ByteArray = readBlock(block, 0, metadata.blocks[block].size)
+
+    fun readBlock(block: Int, offset: Int, len: Int): ByteArray {
+        if (offset < 0 || len < 0 || offset + len > metadata.blocks[block].size) {
+            throw IndexOutOfBoundsException()
+        }
+
         openStream().use {
-            val n = metadata.getBlockOffset(block)
+            val n = metadata.getBlockOffset(block) + offset
             if (it.skip(n) != n) {
                 throw IOException("Unable to set read offset!")
             }
-            val result = ByteArray(metadata.blocks[block].size)
+            val result = ByteArray(len)
             it.readFull(result)
 
             return result

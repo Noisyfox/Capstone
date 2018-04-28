@@ -120,10 +120,11 @@ internal class ResContext(
         }
     }
 
-    fun startDownload(enableResourceFinder: Boolean) {
+    fun startDownload(enableHttp: Boolean, enableResourceFinder: Boolean) {
         service.assertOnWorkingThread()
 
         if (!file.isComplete()) {
+            downloader.isHttpDownloadEnabled = enableHttp
             downloader.isResourceDiscoveryEnabled = enableResourceFinder
             if (downloader.start()) {
                 service.postOnWorkingThread {
@@ -202,9 +203,16 @@ internal class ResContext(
         return try {
             when (command) {
                 null, ResService.COMMAND_DATA -> {
-                    val data = file.readBlock(b)
+                    // Parse the range
+                    val r = queryParameters[ResService.PARAM_RANGE] ?: let {
+                        toRange(0, file.metadata.blocks[b].size)
+                    }
+                    val range = parseRange(r)
+
+                    val data = file.readBlock(b, range.start, range.length)
 
                     val rep = OcRepresentation()
+                    rep.setValue(ResService.PARAM_RANGE, r)
                     rep.setValue(ResService.PARAM_COMMAND, ResService.COMMAND_DATA)
                     rep.setValue(ResService.PARAM_DATA, data)
 
@@ -235,5 +243,26 @@ internal class ResContext(
 
     companion object {
         private val logger = LoggerFactory.getLogger(ResContext::class.java)
+
+        fun parseRange(input: String): IntRange {
+            val r = input.split("-")
+
+            if (r.size != 2) {
+                throw IllegalArgumentException("Malformed range $input")
+            }
+
+            return IntRange(r[0].toInt(), r[1].toInt())
+        }
+
+        fun toRange(offset: Int, length: Int): String {
+            return "$offset-${offset + length - 1}"
+        }
+
+        val IntRange.length
+            get() = if (isEmpty()) {
+                0
+            } else {
+                endInclusive - start + 1
+            }
     }
 }

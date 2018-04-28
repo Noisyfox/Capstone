@@ -24,6 +24,8 @@ internal interface DownloaderComponentListener {
 }
 
 internal interface BlockDownloader : DownloaderComponent {
+    val id: Long
+
     val downloadListeners: MutableList<BlockDownloaderListener>
 
     fun assignBlocks(blocks: Set<Int>)
@@ -40,8 +42,9 @@ internal interface BlockDownloaderListener : DownloaderComponentListener {
     fun onBlockDownloadFailed(downloader: BlockDownloader, block: Int, ex: Throwable?)
 }
 
-internal open class BlockDownloadException(
-        msg: String
-) : IOException(msg)
+internal open class BlockDownloadException : IOException {
+    constructor(msg: String) : super(msg)
+    constructor(msg: String, ex: Throwable) : super(msg, ex)
+}
 
 internal class HashMismatchException : BlockDownloadException("Hash mismatch!")
