@@ -49,6 +49,10 @@ internal class ResContext(
         }
     }
 
+    private val _uploadStatistics = UploaderStatistics()
+    val uploaderStatistics: UploaderStatistics
+        get() = _uploadStatistics.copy()
+
     private var _sharing = true
     var isResourceSharing
         get() = _sharing
