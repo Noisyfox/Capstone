@@ -1,6 +1,7 @@
 package io.noisyfox.resourcesharing.resmanager.downloader
 
 import io.noisyfox.libfilemanager.MarkedFileWriter
+import io.noisyfox.resourcesharing.resmanager.DownloaderStatistics
 import io.noisyfox.resourcesharing.resmanager.ResContext
 import io.noisyfox.resourcesharing.resmanager.safeClose
 import io.noisyfox.resourcesharing.resmanager.safeForEach
@@ -27,6 +28,11 @@ internal class MainDownloader(
     private val service = resContext.service
     private val listeners = service.downloadListeners
     private val file = resContext.file
+
+
+    private val _downloadStatistics = DownloaderStatistics()
+    val downloadStatistics: DownloaderStatistics
+        get() = _downloadStatistics.copy()
 
     private var fileWriter: MarkedFileWriter? = null
 
@@ -88,9 +94,11 @@ internal class MainDownloader(
 
                 currentStatus = Status.Starting
 
+                hatchNewDownloader(DownloadMonitor(this, _downloadStatistics))
+
                 // Pure http download
                 if (isHttpDownloadEnabled) {
-                    val d = HttpBlockDownloader(nextDownloaderId.getAndIncrement(), file.metadata.url, w)
+                    val d = HttpBlockDownloader(nextDownloaderId.getAndIncrement(), file.metadata.url, w, _downloadStatistics)
                     if (hatchNewDownloader(d)) {
                         d.downloadListeners += this
 //                    d.assignBlocks(HashSet(w.openableBlocks))
@@ -104,6 +112,7 @@ internal class MainDownloader(
 
                 if (componentEden.isEmpty()) {
                     currentStatus = Status.Running
+                    _downloadStatistics.onDownloadStarted()
                     rebalanceBlocks()
                     true
                 } else {
@@ -278,6 +287,7 @@ internal class MainDownloader(
                 Status.Starting -> {
                     if (componentEden.isEmpty()) {
                         currentStatus = Status.Running
+                        _downloadStatistics.onDownloadStarted()
                         listeners.safeForEach {
                             it.onDownloadStarted(service, file.id)
                         }
@@ -438,7 +448,7 @@ internal class MainDownloader(
         service.runOnWorkingThread {
             val w = fileWriter ?: return@runOnWorkingThread
 
-            val d = SharingBlockDownloader(nextDownloaderId.getAndIncrement(), r, w)
+            val d = SharingBlockDownloader(nextDownloaderId.getAndIncrement(), r, w, _downloadStatistics)
             if (hatchNewDownloader(d)) {
                 d.downloadListeners += this
             }

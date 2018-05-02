@@ -3,6 +3,7 @@ package io.noisyfox.resourcesharing.resmanager.downloader
 import io.noisyfox.libfilemanager.FileBlock
 import io.noisyfox.libfilemanager.MarkedFileWriter
 import io.noisyfox.libfilemanager.ProgressStatus
+import io.noisyfox.resourcesharing.resmanager.DownloaderStatistics
 import io.noisyfox.resourcesharing.resmanager.safeClose
 import io.noisyfox.resourcesharing.resmanager.safeForEach
 import okhttp3.Call
@@ -21,7 +22,8 @@ import kotlin.math.min
 internal class HttpBlockDownloader(
         override val id: Long,
         private val url: String,
-        private val fileWriter: MarkedFileWriter
+        private val fileWriter: MarkedFileWriter,
+        private val statistics: DownloaderStatistics
 ) : BlockDownloader {
     override val downloadListeners: MutableList<BlockDownloaderListener> = mutableListOf()
 
@@ -180,6 +182,7 @@ internal class HttpBlockDownloader(
 
                                 if (finishBlock(id)) {
                                     if (status == ProgressStatus.Completed) {
+                                        statistics.onHttpBlockDownloaded()
                                         downloadListeners.safeForEach {
                                             it.onBlockDownloaded(this, id)
                                         }
@@ -211,6 +214,7 @@ internal class HttpBlockDownloader(
                             }
                             currentInputIndex += readSize
                             currentBlock.append(buffer, 0, readSize)
+                            statistics.onHttpDownloaded(readSize)
                         }
                     }
                 } catch (e: InterruptedException) {

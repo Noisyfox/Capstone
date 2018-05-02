@@ -3,10 +3,7 @@ package io.noisyfox.resourcesharing.resmanager.downloader
 import io.noisyfox.libfilemanager.FileBlock
 import io.noisyfox.libfilemanager.MarkedFileWriter
 import io.noisyfox.libfilemanager.ProgressStatus
-import io.noisyfox.resourcesharing.resmanager.ResContext
-import io.noisyfox.resourcesharing.resmanager.ResService
-import io.noisyfox.resourcesharing.resmanager.safeClose
-import io.noisyfox.resourcesharing.resmanager.safeForEach
+import io.noisyfox.resourcesharing.resmanager.*
 import org.iotivity.base.OcHeaderOption
 import org.iotivity.base.OcRepresentation
 import org.iotivity.base.OcResource
@@ -19,7 +16,8 @@ import kotlin.concurrent.thread
 internal class SharingBlockDownloader(
         override val id: Long,
         internal val resource: OcResource,
-        private val fileWriter: MarkedFileWriter
+        private val fileWriter: MarkedFileWriter,
+        private val statistics: DownloaderStatistics
 ) : BlockDownloader {
 
     override val downloadListeners: MutableList<BlockDownloaderListener> = mutableListOf()
@@ -101,6 +99,7 @@ internal class SharingBlockDownloader(
 
                             if (finishBlock(id)) {
                                 if (status == ProgressStatus.Completed) {
+                                    statistics.onP2pBlockDownloaded()
                                     downloadListeners.safeForEach {
                                         it.onBlockDownloaded(this, id)
                                     }
@@ -160,6 +159,7 @@ internal class SharingBlockDownloader(
                             throw BlockDownloadException("Unexpected data size!")
                         }
                         currentBlock.append(d)
+                        statistics.onP2pDownloaded(d.size)
                     }
                 } catch (e: InterruptedException) {
                     throw e

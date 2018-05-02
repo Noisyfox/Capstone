@@ -17,7 +17,7 @@ internal class ResContext(
         val file: MarkedFile
 ) : Closeable {
 
-    internal val downloader: MainDownloader = MainDownloader(this)
+    private val downloader: MainDownloader = MainDownloader(this)
 
     private val baseHash = file.metadata.name.getSHA256HexString()
     private val baseUri: String = "${service.baseUri}/$baseHash"
@@ -53,6 +53,9 @@ internal class ResContext(
     val uploaderStatistics: UploaderStatistics
         get() = _uploadStatistics.copy()
 
+    val statistics: FileStatistics
+        get() = FileStatistics(uploaderStatistics, downloader.downloadStatistics)
+
     private var _sharing = true
     var isResourceSharing
         get() = _sharing
@@ -87,6 +90,7 @@ internal class ResContext(
         )
 
         fileHandler = fH
+        _uploadStatistics.reset()
 
         logger.debug("Start sharing file ${file.id}")
     }
@@ -221,6 +225,9 @@ internal class ResContext(
                     rep.setValue(ResService.PARAM_DATA, data)
 
                     request.sendResponse(rep)
+
+                    _uploadStatistics.onDataSent(range.length)
+
                     EntityHandlerResult.OK
                 }
                 ResService.COMMAND_HASH -> {

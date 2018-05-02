@@ -153,6 +153,12 @@ class ResService(
         }
     }
 
+    fun getFileStatistics(fileId: String): FileStatistics = runOnWorkingThread2<FileStatistics> {
+        val f = getResContext(fileId)
+
+        f.statistics
+    }
+
     private fun getResContext(fileId: String): ResContext = managedResources[fileId]
             ?: throw FileNotFoundException("File $fileId not registered!")
 
