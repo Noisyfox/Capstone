@@ -2,14 +2,17 @@ package io.noisyfox.resourcesharing.resmanager
 
 data class DownloaderStatistics(
         var downloadBytes: Long = 0L,
-        var downloadSpeed: Float = 0.0F,
+        var downloadAverageSpeed: Float = 0.0F,
+        var downloadPeekSpeed: Float = 0.0F,
         var downloadBlocks: Int = 0,
         var downloadTime: Long = 0L,
         var httpDownloadBytes: Long = 0L,
-        var httpDownloadSpeed: Float = 0.0F,
+        var httpDownloadAverageSpeed: Float = 0.0F,
+        var httpDownloadPeekSpeed: Float = 0.0F,
         var httpDownloadBlocks: Int = 0,
         var p2pDownloadBytes: Long = 0L,
-        var p2pDownloadSpeed: Float = 0.0F,
+        var p2pDownloadAverageSpeed: Float = 0.0F,
+        var p2pDownloadPeekSpeed: Float = 0.0F,
         var p2pDownloadBlocks: Int = 0
 ) {
 
@@ -21,14 +24,17 @@ data class DownloaderStatistics(
     @Synchronized
     fun reset() {
         downloadBytes = 0L
-        downloadSpeed = 0.0F
+        downloadAverageSpeed = 0.0F
+        downloadPeekSpeed = 0.0F
         downloadBlocks = 0
         downloadTime = 0L
         httpDownloadBytes = 0L
-        httpDownloadSpeed = 0.0F
+        httpDownloadAverageSpeed = 0.0F
+        httpDownloadPeekSpeed = 0.0F
         httpDownloadBlocks = 0
         p2pDownloadBytes = 0L
-        p2pDownloadSpeed = 0.0F
+        p2pDownloadAverageSpeed = 0.0F
+        p2pDownloadPeekSpeed = 0.0F
         p2pDownloadBlocks = 0
 
         speedTotal.reset()
@@ -76,9 +82,12 @@ data class DownloaderStatistics(
 
         downloadTime = System.currentTimeMillis() - downloadStartTime
 
-        downloadSpeed = speedTotal.averageSpeed
-        httpDownloadSpeed = speedHttp.averageSpeed
-        p2pDownloadSpeed = speedP2p.averageSpeed
+        downloadAverageSpeed = speedTotal.averageSpeed
+        downloadPeekSpeed = speedTotal.peekSpeed
+        httpDownloadAverageSpeed = speedHttp.averageSpeed
+        httpDownloadPeekSpeed = speedHttp.peekSpeed
+        p2pDownloadAverageSpeed = speedP2p.averageSpeed
+        p2pDownloadPeekSpeed = speedP2p.peekSpeed
     }
 
 }
