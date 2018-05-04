@@ -8,6 +8,7 @@ import android.view.View
 import android.view.ViewGroup
 import io.noisyfox.resourcesharing.resmanager.ResDownloadListener
 import io.noisyfox.resourcesharing.resmanager.ResService
+import io.noisyfox.resourcesharing.resmanager.downloader.DownloaderStatus
 import kotlinx.android.synthetic.main.fragment_main.*
 import org.slf4j.LoggerFactory
 
@@ -17,7 +18,7 @@ import org.slf4j.LoggerFactory
  * create an instance of this fragment.
  *
  */
-class MainFragment : Fragment(), ResDownloadListener, Logging.LoggingListener {
+class MainFragment : Fragment(), ResDownloadListener {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -59,10 +60,11 @@ class MainFragment : Fragment(), ResDownloadListener, Logging.LoggingListener {
                 service.clearResource(MainApplication.TEST_FILE_1)
             }
         }
-        btn_clear_log.setOnClickListener {
-            logException {
-                Logging.clear()
-            }
+
+        val status = service.getDownloadStatus(MainApplication.TEST_FILE_1)
+        when (status) {
+            DownloaderStatus.Stopped -> onDownloadStopped(service, MainApplication.TEST_FILE_1)
+            else -> onDownloadStarted(service, MainApplication.TEST_FILE_1)
         }
     }
 
@@ -71,32 +73,13 @@ class MainFragment : Fragment(), ResDownloadListener, Logging.LoggingListener {
 
         val service = MainApplication.resourceService
         service.downloadListeners += this
-
-        logText.text = ""
-        onLog(Logging.getAllMessages())
-        Logging.listeners += this
     }
 
     override fun onPause() {
         val service = MainApplication.resourceService
         service.downloadListeners -= this
 
-        Logging.listeners -= this
-
         super.onPause()
-    }
-
-    override fun onLog(message: String) {
-        activity.runOnUiThread {
-            logText.append("$message\n")
-            logScroll.fullScroll(View.FOCUS_DOWN)
-        }
-    }
-
-    override fun onLogClear() {
-        activity.runOnUiThread {
-            logText.text = ""
-        }
     }
 
     override fun onDownloadStarted(service: ResService, fileId: String) {

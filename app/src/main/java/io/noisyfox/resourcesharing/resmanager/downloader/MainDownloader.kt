@@ -12,23 +12,21 @@ import java.io.Closeable
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.ceil
 
+enum class DownloaderStatus {
+    Starting,
+    Running,
+    Stopping,
+    Stopped,
+    StartAfterStopped,
+    StopAfterStarted
+}
+
 internal class MainDownloader(
         internal val resContext: ResContext
 ) : BlockDownloaderListener, ResourceFindListener, Closeable {
-
-    private enum class Status {
-        Starting,
-        Running,
-        Stopping,
-        Stopped,
-        StartAfterStopped,
-        StopAfterStarted
-    }
-
     private val service = resContext.service
     private val listeners = service.downloadListeners
     private val file = resContext.file
-
 
     private val _downloadStatistics = DownloaderStatistics()
     val downloadStatistics: DownloaderStatistics
@@ -41,7 +39,8 @@ internal class MainDownloader(
     private val blockDistributeMap: MutableMap<Long, Pair<BlockDownloader, MutableSet<Int>>> = mutableMapOf()
     private val nextDownloaderId: AtomicLong = AtomicLong(0)
 
-    private var currentStatus: Status = Status.Stopped
+    var currentStatus: DownloaderStatus = DownloaderStatus.Stopped
+        private set
 
     private var _useHttp = true
     internal var isHttpDownloadEnabled: Boolean
@@ -50,7 +49,7 @@ internal class MainDownloader(
             service.assertOnWorkingThread()
 
             when (currentStatus) {
-                Status.Stopped -> _useHttp = value
+                DownloaderStatus.Stopped -> _useHttp = value
                 else -> throw IllegalStateException("Can't change during download!")
             }
         }
@@ -62,7 +61,7 @@ internal class MainDownloader(
             service.assertOnWorkingThread()
 
             when (currentStatus) {
-                Status.Stopped -> _useResDiscovery = value
+                DownloaderStatus.Stopped -> _useResDiscovery = value
                 else -> throw IllegalStateException("Can't change during download!")
             }
         }
@@ -71,18 +70,18 @@ internal class MainDownloader(
         service.assertOnWorkingThread()
 
         return when (currentStatus) {
-            Status.Stopping -> {
-                currentStatus = Status.StartAfterStopped
+            DownloaderStatus.Stopping -> {
+                currentStatus = DownloaderStatus.StartAfterStopped
                 false
             }
-            Status.StartAfterStopped -> false
-            Status.StopAfterStarted -> {
-                currentStatus = Status.Starting
+            DownloaderStatus.StartAfterStopped -> false
+            DownloaderStatus.StopAfterStarted -> {
+                currentStatus = DownloaderStatus.Starting
                 false
             }
-            Status.Running -> true
-            Status.Starting -> false
-            Status.Stopped -> {
+            DownloaderStatus.Running -> true
+            DownloaderStatus.Starting -> false
+            DownloaderStatus.Stopped -> {
                 if (components.isNotEmpty()) {
                     throw IllegalStateException("Components not empty! Fetal error!")
                 }
@@ -92,7 +91,7 @@ internal class MainDownloader(
 
                 fileWriter = w
 
-                currentStatus = Status.Starting
+                currentStatus = DownloaderStatus.Starting
 
                 hatchNewDownloader(DownloadMonitor(this, _downloadStatistics))
 
@@ -111,7 +110,7 @@ internal class MainDownloader(
                 }
 
                 if (componentEden.isEmpty()) {
-                    currentStatus = Status.Running
+                    currentStatus = DownloaderStatus.Running
                     _downloadStatistics.onDownloadStarted()
                     rebalanceBlocks()
                     true
@@ -126,30 +125,30 @@ internal class MainDownloader(
         service.assertOnWorkingThread()
 
         return when (currentStatus) {
-            Status.Starting -> {
-                currentStatus = Status.StopAfterStarted
+            DownloaderStatus.Starting -> {
+                currentStatus = DownloaderStatus.StopAfterStarted
                 false
             }
-            Status.Stopping -> false
-            Status.Stopped -> true
-            Status.StartAfterStopped -> {
-                currentStatus = Status.Stopping
+            DownloaderStatus.Stopping -> false
+            DownloaderStatus.Stopped -> true
+            DownloaderStatus.StartAfterStopped -> {
+                currentStatus = DownloaderStatus.Stopping
                 false
             }
-            Status.StopAfterStarted -> false
-            Status.Running -> {
+            DownloaderStatus.StopAfterStarted -> false
+            DownloaderStatus.Running -> {
                 components.safeForEach {
                     if (it.stop()) {
                         components.remove(it)
                     }
                 }
                 if (componentEden.isEmpty() && components.isEmpty()) {
-                    currentStatus = Status.Stopped
+                    currentStatus = DownloaderStatus.Stopped
                     fileWriter?.safeClose()
                     fileWriter = null
                     true
                 } else {
-                    currentStatus = Status.Stopping
+                    currentStatus = DownloaderStatus.Stopping
                     false
                 }
             }
@@ -159,7 +158,7 @@ internal class MainDownloader(
     internal fun isStopped(): Boolean {
         service.assertOnWorkingThread()
 
-        return currentStatus == Status.Stopped
+        return currentStatus == DownloaderStatus.Stopped
     }
 
     /**
@@ -253,7 +252,7 @@ internal class MainDownloader(
         service.assertOnWorkingThread()
 
         return when (currentStatus) {
-            Status.Starting -> {
+            DownloaderStatus.Starting -> {
                 componentEden.add(downloader)
                 if (downloader.start()) {
                     componentEden.remove(downloader)
@@ -261,17 +260,17 @@ internal class MainDownloader(
                 }
                 true
             }
-            Status.Running -> {
+            DownloaderStatus.Running -> {
                 componentEden.add(downloader)
                 if (downloader.start()) {
                     onComponentStarted(downloader)
                 }
                 true
             }
-            Status.Stopping -> false
-            Status.Stopped -> false
-            Status.StartAfterStopped -> false
-            Status.StopAfterStarted -> false
+            DownloaderStatus.Stopping -> false
+            DownloaderStatus.Stopped -> false
+            DownloaderStatus.StartAfterStopped -> false
+            DownloaderStatus.StopAfterStarted -> false
         }
     }
 
@@ -284,9 +283,9 @@ internal class MainDownloader(
             components.add(component)
 
             when (currentStatus) {
-                Status.Starting -> {
+                DownloaderStatus.Starting -> {
                     if (componentEden.isEmpty()) {
-                        currentStatus = Status.Running
+                        currentStatus = DownloaderStatus.Running
                         _downloadStatistics.onDownloadStarted()
                         listeners.safeForEach {
                             it.onDownloadStarted(service, file.id)
@@ -294,9 +293,9 @@ internal class MainDownloader(
                         rebalanceBlocks()
                     }
                 }
-                Status.StopAfterStarted -> {
+                DownloaderStatus.StopAfterStarted -> {
                     if (componentEden.isEmpty()) {
-                        currentStatus = Status.Running
+                        currentStatus = DownloaderStatus.Running
 
                         if (stop()) {
                             listeners.safeForEach {
@@ -305,16 +304,16 @@ internal class MainDownloader(
                         }
                     }
                 }
-                Status.Running -> {
+                DownloaderStatus.Running -> {
                     rebalanceBlocks()
                 }
-                Status.Stopping, Status.StartAfterStopped -> {
+                DownloaderStatus.Stopping, DownloaderStatus.StartAfterStopped -> {
                     // Oops! God told us to stop
                     if (component.stop()) {
                         onComponentStopped(component)
                     }
                 }
-                Status.Stopped -> {
+                DownloaderStatus.Stopped -> {
                     // Something goes wrong!
                     logger.error("Child downloader started after main downloader stopped! Not good!")
                     if (component.stop()) {
@@ -343,13 +342,13 @@ internal class MainDownloader(
             }
 
             when (currentStatus) {
-                Status.Starting, Status.StopAfterStarted -> {
+                DownloaderStatus.Starting, DownloaderStatus.StopAfterStarted -> {
                     // Ignored
                     logger.debug("Child downloader stopped during main downloader starting.")
                     if (componentEden.isEmpty() && components.isEmpty()) {
                         logger.error("All child downloader stopped during main downloader starting!")
 
-                        currentStatus = Status.Running
+                        currentStatus = DownloaderStatus.Running
                         if (stop()) {
                             listeners.safeForEach {
                                 it.onDownloadStopped(service, file.id)
@@ -357,7 +356,7 @@ internal class MainDownloader(
                         }
                     }
                 }
-                Status.Running -> {
+                DownloaderStatus.Running -> {
                     if (componentEden.isEmpty() && components.isEmpty()) {
                         logger.error("All child downloader stopped during main downloader running!")
 
@@ -370,9 +369,9 @@ internal class MainDownloader(
                         rebalanceBlocks()
                     }
                 }
-                Status.Stopping -> {
+                DownloaderStatus.Stopping -> {
                     if (componentEden.isEmpty() && components.isEmpty()) {
-                        currentStatus = Status.Stopped
+                        currentStatus = DownloaderStatus.Stopped
                         fileWriter?.safeClose()
                         fileWriter = null
 
@@ -381,9 +380,9 @@ internal class MainDownloader(
                         }
                     }
                 }
-                Status.StartAfterStopped -> {
+                DownloaderStatus.StartAfterStopped -> {
                     if (componentEden.isEmpty() && components.isEmpty()) {
-                        currentStatus = Status.Stopped
+                        currentStatus = DownloaderStatus.Stopped
                         fileWriter?.safeClose()
                         fileWriter = null
 
@@ -395,7 +394,7 @@ internal class MainDownloader(
                         }
                     }
                 }
-                Status.Stopped -> {
+                DownloaderStatus.Stopped -> {
                     // Ignored
                     logger.warn("Child downloader stopped after main downloader stopped. Not ideal.")
                 }

@@ -2,6 +2,7 @@ package io.noisyfox.resourcesharing.resmanager
 
 import io.noisyfox.libfilemanager.MarkedFile
 import io.noisyfox.libfilemanager.getSHA256HexString
+import io.noisyfox.resourcesharing.resmanager.downloader.DownloaderStatus
 import io.noisyfox.resourcesharing.resmanager.downloader.MainDownloader
 import org.iotivity.base.*
 import org.slf4j.LoggerFactory
@@ -55,6 +56,9 @@ internal class ResContext(
 
     val statistics: FileStatistics
         get() = FileStatistics(uploaderStatistics, downloader.downloadStatistics)
+
+    val downloadStatus: DownloaderStatus
+        get() = downloader.currentStatus
 
     private var _sharing = true
     var isResourceSharing

@@ -5,6 +5,7 @@ import android.os.Handler
 import android.os.HandlerThread
 import io.noisyfox.libfilemanager.FileManager
 import io.noisyfox.libfilemanager.getSHA256HexString
+import io.noisyfox.resourcesharing.resmanager.downloader.DownloaderStatus
 import org.iotivity.base.*
 import org.iotivity.ca.CaInterface
 import org.slf4j.LoggerFactory
@@ -151,6 +152,12 @@ class ResService(
 
             f.stopDownload()
         }
+    }
+
+    fun getDownloadStatus(fileId: String): DownloaderStatus = runOnWorkingThread2<DownloaderStatus> {
+        val f = getResContext(fileId)
+
+        f.downloadStatus
     }
 
     fun getFileStatistics(fileId: String): FileStatistics = runOnWorkingThread2<FileStatistics> {
