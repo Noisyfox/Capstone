@@ -132,7 +132,9 @@ class MainFragment : Fragment(), ResDownloadListener {
         val d = stat.download
 
         val sb = StringBuilder()
-                .append("Upload: ${toReadableSize(stat.upload.uploadBytes)}\n")
+                .append("Upload:\n")
+                .append("  Size: ").append(toReadableSize(stat.upload.uploadBytes)).append("\n")
+                .append("  Speed: ").append(toReadableSpeed(stat.upload.uploadSpeed)).append("\n")
                 .append("\n")
                 .append("Time Elapsed: ").append(toReadableTime(d.downloadTime)).append("\n")
                 .append("Total Download:\n")

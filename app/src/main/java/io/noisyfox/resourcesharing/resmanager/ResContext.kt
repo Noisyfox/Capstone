@@ -52,7 +52,7 @@ internal class ResContext(
 
     private val _uploadStatistics = UploaderStatistics()
     val uploaderStatistics: UploaderStatistics
-        get() = _uploadStatistics.copy()
+        get() = _uploadStatistics.updateAndCopy()
 
     val statistics: FileStatistics
         get() = FileStatistics(uploaderStatistics, downloader.downloadStatistics)
