@@ -2,6 +2,7 @@ package io.noisyfox.resourcesharing
 
 
 import android.os.Bundle
+import android.os.Handler
 import android.support.v4.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
@@ -19,6 +20,13 @@ import org.slf4j.LoggerFactory
  *
  */
 class MainFragment : Fragment(), ResDownloadListener {
+    private val handler = Handler()
+    private val statisticsUpdateRunnable: Runnable = object : Runnable {
+        override fun run() {
+            updateStatistics()
+            handler.postDelayed(this, 1000)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -66,6 +74,8 @@ class MainFragment : Fragment(), ResDownloadListener {
             DownloaderStatus.Stopped -> onDownloadStopped(service, MainApplication.TEST_FILE_1)
             else -> onDownloadStarted(service, MainApplication.TEST_FILE_1)
         }
+
+        updateStatistics()
     }
 
     override fun onResume() {
@@ -73,11 +83,13 @@ class MainFragment : Fragment(), ResDownloadListener {
 
         val service = MainApplication.resourceService
         service.downloadListeners += this
+        handler.postDelayed(statisticsUpdateRunnable, 1000)
     }
 
     override fun onPause() {
         val service = MainApplication.resourceService
         service.downloadListeners -= this
+        handler.removeCallbacks(statisticsUpdateRunnable)
 
         super.onPause()
     }
@@ -114,6 +126,31 @@ class MainFragment : Fragment(), ResDownloadListener {
         }
     }
 
+    private fun updateStatistics() {
+        val service = MainApplication.resourceService
+        val stat = service.getFileStatistics(MainApplication.TEST_FILE_1)
+        val d = stat.download
+
+        val sb = StringBuilder()
+                .append("Upload: ${toReadableSize(stat.upload.uploadBytes)}\n")
+                .append("\n")
+                .append("Time Elapsed: ").append(toReadableTime(d.downloadTime)).append("\n")
+                .append("Total Download:\n")
+                .append("  Size: ").append(toReadableSize(d.downloadBytes)).append("\n")
+                .append("  Speed: ").append(toReadableSpeed(d.downloadSpeed)).append("\n")
+                .append("  ").append(d.downloadBlocks).append(" blocks").append("\n")
+                .append("Http Download:\n")
+                .append("  Size: ").append(toReadableSize(d.httpDownloadBytes)).append("\n")
+                .append("  Speed: ").append(toReadableSpeed(d.httpDownloadSpeed)).append("\n")
+                .append("  ").append(d.httpDownloadBlocks).append(" blocks").append("\n")
+                .append("P2P Download:\n")
+                .append("  Size: ").append(toReadableSize(d.p2pDownloadBytes)).append("\n")
+                .append("  Speed: ").append(toReadableSpeed(d.p2pDownloadSpeed)).append("\n")
+                .append("  ").append(d.p2pDownloadBlocks).append(" blocks").append("\n")
+
+        statisticsText.text = sb.toString()
+    }
+
     companion object {
         private val logger = LoggerFactory.getLogger(MainFragment::class.java)
 
@@ -126,6 +163,58 @@ class MainFragment : Fragment(), ResDownloadListener {
             } catch (e: Exception) {
                 logger.error("", e)
             }
+        }
+
+        fun toReadableSpeed(speed: Float): String {
+            if (speed <= 0) {
+                return "0B/s"
+            }
+
+            if (speed < 500) {
+                return "%.2fB/s".format(speed)
+            }
+
+            var s = speed / 1024F
+            if (s < 500) {
+                return "%.2fKB/s".format(s)
+            }
+
+            s /= 1024F
+            if (s < 500) {
+                return "%.2fMB/s".format(s)
+            }
+
+            s /= 1024F
+            return "%.2fGB/s".format(s)
+        }
+
+        fun toReadableSize(size: Long): String {
+            if (size <= 0) {
+                return "0B"
+            }
+
+            if (size < 500) {
+                return "${size}B"
+            }
+
+            var s = size / 1024F
+            if (s < 500) {
+                return "%.2fKB".format(s)
+            }
+
+            s /= 1024F
+            if (s < 500) {
+                return "%.2fMB".format(s)
+            }
+
+            s /= 1024F
+            return "%.2fGB".format(s)
+        }
+
+        fun toReadableTime(millis: Long): String {
+            val s = millis / 1000
+
+            return "%02d:%02d:%02d".format(s / 3600, (s % 3600) / 60, (s % 60))
         }
     }
 }
