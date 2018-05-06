@@ -185,14 +185,6 @@ internal class MainDownloader(
 
         val httpDownloaders = components.filterIsInstance<HttpBlockDownloader>()
         val sharingDownloaders = components.filterIsInstance<SharingBlockDownloader>()
-        val hdCount = httpDownloaders.size
-        val sdCount = sharingDownloaders.size
-
-        val total = hdCount + sdCount
-        if (total == 0) {
-            // Nothing to do
-            return
-        }
 
         // Remove absent from blockDistributeMap
         val allDownloaders = (httpDownloaders + sharingDownloaders)
@@ -200,45 +192,52 @@ internal class MainDownloader(
         val absent = blockDistributeMap.keys.filter { it !in ids }
         blockDistributeMap -= absent
 
-        // Evenly distribute for now, TODO: add block rebalance strategy
-        val remainBlocks = w.writableBlocks
-        val size = ceil(remainBlocks.size.toFloat() / total.toFloat()).toInt()
+        val hdCount = httpDownloaders.size
+        val sdCount = sharingDownloaders.size
 
-        // Remove blocks if assigned more than <size> blocks
-        blockDistributeMap.forEach { _, (downloader, blocks) ->
-            if (blocks.size > size) {
-                val extra = when (downloader) {
-                    is HttpBlockDownloader -> {
-                        blocks.toList().sortedDescending().take(blocks.size - size)
-                    }
-                    else -> {
-                        blocks.toList().sorted().take(blocks.size - size)
-                    }
-                }.toSet()
+        val total = hdCount + sdCount
+        if (total != 0) {
+            // Evenly distribute for now, TODO: add block rebalance strategy
+            val remainBlocks = w.writableBlocks
+            val size = ceil(remainBlocks.size.toFloat() / total.toFloat()).toInt()
 
-                downloader.unassignBlocks2(extra)
-            }
-        }
-
-        val unassignedBlocks = (remainBlocks - (blockDistributeMap.values.map { it.second }.flatten())).sorted().toMutableList()
-        allDownloaders.map { Pair(it.getAssignedBlocksCount(), it) }.sortedBy { it.first }
-                .forEach { (c, downloader) ->
-                    val s = when (downloader) {
+            // Remove blocks if assigned more than <size> blocks
+            blockDistributeMap.forEach { _, (downloader, blocks) ->
+                if (blocks.size > size) {
+                    val extra = when (downloader) {
                         is HttpBlockDownloader -> {
-                            unassignedBlocks.take(size - c).toSet()
+                            blocks.toList().sortedDescending().take(blocks.size - size)
                         }
                         else -> {
-                            unassignedBlocks.takeLast(size - c).toSet()
+                            blocks.toList().sorted().take(blocks.size - size)
                         }
-                    }
-                    unassignedBlocks.removeAll(s)
-                    downloader.assignBlocks2(s)
-                }
+                    }.toSet()
 
-        if (unassignedBlocks.isNotEmpty()) {
-            // Hmmmm, shouldn't happen
-            // Give all to the last downloader!
-            allDownloaders.last().assignBlocks2(unassignedBlocks.toSet())
+                    downloader.unassignBlocks2(extra)
+                }
+            }
+
+            val unassignedBlocks = (remainBlocks - (blockDistributeMap.values.map { it.second }.flatten())).sorted().toMutableList()
+            allDownloaders.map { Pair(it.getAssignedBlocksCount(), it) }.sortedBy { it.first }
+                    .forEach { (c, downloader) ->
+                        val s = when (downloader) {
+                            is HttpBlockDownloader -> {
+                                unassignedBlocks.take(size - c).toSet()
+                            }
+                            else -> {
+                                unassignedBlocks.takeLast(size - c).toSet()
+                            }
+                        }
+                        unassignedBlocks.removeAll(s)
+                        downloader.assignBlocks2(s)
+                    }
+
+            if (unassignedBlocks.isNotEmpty()) {
+                // Hmmmm, shouldn't happen
+                // Give all to the last downloader!
+                allDownloaders.last().assignBlocks2(unassignedBlocks.toSet())
+            }
+
         }
 
         resContext.blockInspector.withBlockRedestributed(getBlockDistribution())
@@ -355,6 +354,7 @@ internal class MainDownloader(
 
             if (component is BlockDownloader) {
                 blockDistributeMap.remove(component.id)
+                resContext.blockInspector.withBlockRedestributed(getBlockDistribution())
             }
 
             when (currentStatus) {
