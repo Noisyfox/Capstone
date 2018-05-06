@@ -96,7 +96,7 @@ internal class ResFinder(
 
         val newResource = synchronized(threadLock) {
             val t = workingThread
-            if (t == null || !t.isAlive) {
+            if (t == null || !t.isAlive || requestToStop) {
                 return@synchronized null
             }
 

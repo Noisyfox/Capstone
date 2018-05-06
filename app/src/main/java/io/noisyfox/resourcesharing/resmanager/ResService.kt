@@ -5,6 +5,7 @@ import android.os.Handler
 import android.os.HandlerThread
 import io.noisyfox.libfilemanager.FileManager
 import io.noisyfox.libfilemanager.getSHA256HexString
+import io.noisyfox.resourcesharing.resmanager.downloader.BasicDownloadStrategy
 import io.noisyfox.resourcesharing.resmanager.downloader.DownloaderStatus
 import org.iotivity.base.*
 import org.iotivity.ca.CaInterface
@@ -135,14 +136,11 @@ class ResService(
         }
     }
 
-    fun startDownload(fileId: String, enableHttp: Boolean = true, enableResourceFinder: Boolean = true) {
-        if (!enableHttp && !enableResourceFinder) {
-            throw IllegalArgumentException("Must enable at least one of http download/resource finder!")
-        }
+    fun startDownload(fileId: String, downloadStrategy: BasicDownloadStrategy = BasicDownloadStrategy.Balanced) {
         runOnWorkingThread2 {
             val f = getResContext(fileId)
 
-            f.startDownload(enableHttp, enableResourceFinder)
+            f.startDownload(downloadStrategy)
         }
     }
 

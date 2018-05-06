@@ -18,6 +18,18 @@ enum class DownloaderStatus {
     StopAfterStarted
 }
 
+enum class BasicDownloadStrategy {
+    HttpOnly,
+    P2POnly,
+    Balanced,
+    HttpPriority,
+    P2PPriority;
+
+    fun isHttpEnabled(): Boolean = this != P2POnly
+
+    fun isP2pEnabled(): Boolean = this != HttpOnly
+}
+
 internal class MainDownloader(
         internal val resContext: ResContext
 ) : BlockDownloaderListener, ResourceFindListener, Closeable {
@@ -39,26 +51,14 @@ internal class MainDownloader(
     var currentStatus: DownloaderStatus = DownloaderStatus.Stopped
         private set
 
-    private var _useHttp = true
-    internal var isHttpDownloadEnabled: Boolean
-        get() = _useHttp
+    private var _downloadStrategy: BasicDownloadStrategy = BasicDownloadStrategy.Balanced
+    internal var downloadStrategy: BasicDownloadStrategy
+        get() = _downloadStrategy
         set(value) {
             service.assertOnWorkingThread()
 
             when (currentStatus) {
-                DownloaderStatus.Stopped -> _useHttp = value
-                else -> throw IllegalStateException("Can't change during download!")
-            }
-        }
-
-    private var _useResDiscovery = true
-    internal var isResourceDiscoveryEnabled: Boolean
-        get() = _useResDiscovery
-        set(value) {
-            service.assertOnWorkingThread()
-
-            when (currentStatus) {
-                DownloaderStatus.Stopped -> _useResDiscovery = value
+                DownloaderStatus.Stopped -> _downloadStrategy = value
                 else -> throw IllegalStateException("Can't change during download!")
             }
         }
@@ -92,18 +92,26 @@ internal class MainDownloader(
 
                 hatchNewDownloader(DownloadMonitor(this, _downloadStatistics))
 
-                // Pure http download
-                if (isHttpDownloadEnabled) {
-                    val d = HttpBlockDownloader(nextDownloaderId.getAndIncrement(), file.metadata.url, w, _downloadStatistics)
-                    if (hatchNewDownloader(d)) {
-                        d.downloadListeners += this
-//                    d.assignBlocks(HashSet(w.openableBlocks))
+                when (downloadStrategy) {
+                    BasicDownloadStrategy.HttpOnly, BasicDownloadStrategy.HttpPriority -> {
+                        val d = HttpBlockDownloader(nextDownloaderId.getAndIncrement(), file.metadata.url, w, _downloadStatistics)
+                        if (hatchNewDownloader(d)) {
+                            d.downloadListeners += this
+                        }
                     }
-                }
+                    BasicDownloadStrategy.P2POnly, BasicDownloadStrategy.P2PPriority -> {
+                        val finder = ResFinder(this)
+                        hatchNewDownloader(finder)
+                    }
+                    BasicDownloadStrategy.Balanced -> {
+                        val d = HttpBlockDownloader(nextDownloaderId.getAndIncrement(), file.metadata.url, w, _downloadStatistics)
+                        if (hatchNewDownloader(d)) {
+                            d.downloadListeners += this
+                        }
 
-                if (isResourceDiscoveryEnabled) {
-                    val finder = ResFinder(this)
-                    hatchNewDownloader(finder)
+                        val finder = ResFinder(this)
+                        hatchNewDownloader(finder)
+                    }
                 }
 
                 if (componentEden.isEmpty()) {
@@ -468,11 +476,13 @@ internal class MainDownloader(
         logger.debug("Resource found: ${r.url}")
 
         service.runOnWorkingThread {
-            val w = fileWriter ?: return@runOnWorkingThread
+            if (downloadStrategy.isP2pEnabled()) {
+                val w = fileWriter ?: return@runOnWorkingThread
 
-            val d = SharingBlockDownloader(nextDownloaderId.getAndIncrement(), r, w, _downloadStatistics)
-            if (hatchNewDownloader(d)) {
-                d.downloadListeners += this
+                val d = SharingBlockDownloader(nextDownloaderId.getAndIncrement(), r, w, _downloadStatistics)
+                if (hatchNewDownloader(d)) {
+                    d.downloadListeners += this
+                }
             }
         }
     }

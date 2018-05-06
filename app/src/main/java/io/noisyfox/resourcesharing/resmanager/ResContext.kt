@@ -2,6 +2,7 @@ package io.noisyfox.resourcesharing.resmanager
 
 import io.noisyfox.libfilemanager.MarkedFile
 import io.noisyfox.libfilemanager.getSHA256HexString
+import io.noisyfox.resourcesharing.resmanager.downloader.BasicDownloadStrategy
 import io.noisyfox.resourcesharing.resmanager.downloader.DownloaderStatus
 import io.noisyfox.resourcesharing.resmanager.downloader.MainDownloader
 import org.iotivity.base.*
@@ -134,12 +135,11 @@ internal class ResContext(
         blockInspector.clear()
     }
 
-    fun startDownload(enableHttp: Boolean, enableResourceFinder: Boolean) {
+    fun startDownload(downloadStrategy: BasicDownloadStrategy) {
         service.assertOnWorkingThread()
 
         if (!file.isComplete()) {
-            downloader.isHttpDownloadEnabled = enableHttp
-            downloader.isResourceDiscoveryEnabled = enableResourceFinder
+            downloader.downloadStrategy = downloadStrategy
             if (downloader.start()) {
                 service.postOnWorkingThread {
                     service.downloadListeners.safeForEach {

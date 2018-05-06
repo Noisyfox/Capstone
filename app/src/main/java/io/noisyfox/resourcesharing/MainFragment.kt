@@ -9,6 +9,7 @@ import android.view.View
 import android.view.ViewGroup
 import io.noisyfox.resourcesharing.resmanager.ResDownloadListener
 import io.noisyfox.resourcesharing.resmanager.ResService
+import io.noisyfox.resourcesharing.resmanager.downloader.BasicDownloadStrategy
 import io.noisyfox.resourcesharing.resmanager.downloader.DownloaderStatus
 import kotlinx.android.synthetic.main.fragment_main.*
 import org.slf4j.LoggerFactory
@@ -45,17 +46,17 @@ class MainFragment : Fragment(), ResDownloadListener {
 
         btn_direct_download.setOnClickListener {
             logException {
-                service.startDownload(MainApplication.TEST_FILE_1, true, false)
+                service.startDownload(MainApplication.TEST_FILE_1, BasicDownloadStrategy.HttpOnly)
             }
         }
         btn_res_only_download.setOnClickListener {
             logException {
-                service.startDownload(MainApplication.TEST_FILE_1, false, true)
+                service.startDownload(MainApplication.TEST_FILE_1, BasicDownloadStrategy.P2POnly)
             }
         }
         btn_smart_download.setOnClickListener {
             logException {
-                service.startDownload(MainApplication.TEST_FILE_1, true, true)
+                service.startDownload(MainApplication.TEST_FILE_1, BasicDownloadStrategy.Balanced)
             }
         }
         btn_stop.setOnClickListener {
