@@ -58,6 +58,7 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         // Handle navigation view item clicks here.
         val fragment = when (item.itemId) {
             R.id.nav_main -> MainFragment.newInstance()
+            R.id.nav_blocks -> BlockViewFragment.newInstance()
             R.id.nav_logs -> LogFragment.newInstance()
             R.id.nav_manage -> MainFragment.newInstance()
             else -> throw IllegalArgumentException("Unknown id ${item.itemId}.")

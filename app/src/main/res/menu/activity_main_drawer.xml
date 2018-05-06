@@ -9,6 +9,10 @@
             android:icon="@drawable/ic_menu_send"
             android:title="Main" />
         <item
+            android:id="@+id/nav_blocks"
+            android:icon="@drawable/ic_menu_manage"
+            android:title="Blocks" />
+        <item
             android:id="@+id/nav_logs"
             android:icon="@drawable/ic_menu_manage"
             android:title="Logs" />
