@@ -54,9 +54,14 @@ class MainFragment : Fragment(), ResDownloadListener {
                 service.startDownload(MainApplication.TEST_FILE_1, BasicDownloadStrategy.P2POnly)
             }
         }
-        btn_smart_download.setOnClickListener {
+        btn_smart_download_balance.setOnClickListener {
             logException {
                 service.startDownload(MainApplication.TEST_FILE_1, BasicDownloadStrategy.Balanced)
+            }
+        }
+        btn_smart_download_p2p.setOnClickListener {
+            logException {
+                service.startDownload(MainApplication.TEST_FILE_1, BasicDownloadStrategy.P2PPriority)
             }
         }
         btn_stop.setOnClickListener {
@@ -99,7 +104,8 @@ class MainFragment : Fragment(), ResDownloadListener {
         activity.runOnUiThread {
             btn_stop.isEnabled = true
             btn_clear_cache.isEnabled = false
-            btn_smart_download.isEnabled = false
+            btn_smart_download_balance.isEnabled = false
+            btn_smart_download_p2p.isEnabled = false
             btn_direct_download.isEnabled = false
             btn_res_only_download.isEnabled = false
         }
@@ -121,7 +127,8 @@ class MainFragment : Fragment(), ResDownloadListener {
         activity.runOnUiThread {
             btn_stop.isEnabled = false
             btn_clear_cache.isEnabled = true
-            btn_smart_download.isEnabled = true
+            btn_smart_download_balance.isEnabled = true
+            btn_smart_download_p2p.isEnabled = true
             btn_direct_download.isEnabled = true
             btn_res_only_download.isEnabled = true
         }

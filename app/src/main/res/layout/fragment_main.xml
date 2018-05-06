@@ -34,11 +34,18 @@
             android:text="P2P-only Download" />
     </LinearLayout>
 
+
     <Button
-        android:id="@+id/btn_smart_download"
+        android:id="@+id/btn_smart_download_balance"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Smart Download" />
+        android:text="Smart Download (Balanced)" />
+
+    <Button
+        android:id="@+id/btn_smart_download_p2p"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Smart Download (P2P First)" />
 
     <LinearLayout
         android:layout_width="match_parent"

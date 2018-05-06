@@ -89,6 +89,7 @@ internal class MainDownloader(
                 fileWriter = w
 
                 currentStatus = DownloaderStatus.Starting
+                peekSpeedCount = 0
 
                 hatchNewDownloader(DownloadMonitor(this, _downloadStatistics))
 
@@ -181,6 +182,55 @@ internal class MainDownloader(
         }
 
         return result
+    }
+
+    /**
+     * Start/stop sub downloaders based on downloadStrategy
+     */
+    internal fun updateDownloader() {
+        service.runOnWorkingThread {
+            when (downloadStrategy) {
+                BasicDownloadStrategy.HttpPriority -> {
+
+                }
+                BasicDownloadStrategy.P2PPriority -> {
+                    doP2PPriorityCheck()
+                }
+            }
+        }
+    }
+
+    private var peekSpeedCount: Int = 0
+
+    private fun doP2PPriorityCheck() {
+        // Check if http download already started
+        val httpDownloaders = (components + componentEden).filterIsInstance<HttpBlockDownloader>()
+        if (httpDownloaders.isNotEmpty()) {
+            return
+        }
+
+        val statistics = downloadStatistics
+        if (statistics.downloadTime < 60) {
+            return
+        }
+
+        if (statistics.p2pDownloadPeekSpeed < 50) {
+            peekSpeedCount++
+        } else {
+            peekSpeedCount = 0
+        }
+
+        if (peekSpeedCount < 5) {
+            return
+        }
+        peekSpeedCount = 0
+
+        // Too slow! Start http download
+        val w = fileWriter!!
+        val d = HttpBlockDownloader(nextDownloaderId.getAndIncrement(), file.metadata.url, w, _downloadStatistics)
+        if (hatchNewDownloader(d)) {
+            d.downloadListeners += this
+        }
     }
 
     /**

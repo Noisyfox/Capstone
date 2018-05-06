@@ -22,9 +22,9 @@ internal class DownloadMonitor(
             while (!requestToStop) {
                 statistics.updateSpeed()
 
-                // TODO: start more downloader based on downloadStrategy
+                downloader.updateDownloader()
 
-                // Wait 60s
+                // Wait 5s
                 synchronized(threadLock) {
                     threadLock.wait(5 * 1000)
                 }
