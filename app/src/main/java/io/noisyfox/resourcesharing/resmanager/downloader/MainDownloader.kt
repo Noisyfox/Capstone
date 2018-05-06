@@ -206,30 +206,51 @@ internal class MainDownloader(
         // Check if http download already started
         val httpDownloaders = (components + componentEden).filterIsInstance<HttpBlockDownloader>()
         if (httpDownloaders.isNotEmpty()) {
-            return
-        }
+            val statistics = downloadStatistics
 
-        val statistics = downloadStatistics
-        if (statistics.downloadTime < 60) {
-            return
-        }
+            if (statistics.p2pDownloadPeekSpeed > 50) {
+                peekSpeedCount++
+            } else {
+                peekSpeedCount = 0
+            }
 
-        if (statistics.p2pDownloadPeekSpeed < 50) {
-            peekSpeedCount++
-        } else {
+            if (peekSpeedCount < 5) {
+                return
+            }
+
             peekSpeedCount = 0
-        }
 
-        if (peekSpeedCount < 5) {
-            return
-        }
-        peekSpeedCount = 0
+            // P2p download is fast enough, shutdown http downloaders
+            httpDownloaders.forEach {
+                if (it in components) {
+                    if (it.stop()) {
+                        onComponentStopped(it)
+                    }
+                }
+            }
+        } else {
+            val statistics = downloadStatistics
+            if (statistics.downloadTime < 60) {
+                return
+            }
 
-        // Too slow! Start http download
-        val w = fileWriter!!
-        val d = HttpBlockDownloader(nextDownloaderId.getAndIncrement(), file.metadata.url, w, _downloadStatistics)
-        if (hatchNewDownloader(d)) {
-            d.downloadListeners += this
+            if (statistics.p2pDownloadPeekSpeed < 50) {
+                peekSpeedCount++
+            } else {
+                peekSpeedCount = 0
+            }
+
+            if (peekSpeedCount < 5) {
+                return
+            }
+            peekSpeedCount = 0
+
+            // Too slow! Start http download
+            val w = fileWriter!!
+            val d = HttpBlockDownloader(nextDownloaderId.getAndIncrement(), file.metadata.url, w, _downloadStatistics)
+            if (hatchNewDownloader(d)) {
+                d.downloadListeners += this
+            }
         }
     }
 
