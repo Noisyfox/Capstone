@@ -2,6 +2,7 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:layout_margin="10dp"
     android:orientation="vertical">
 
     <android.support.v7.widget.RecyclerView
@@ -12,10 +13,159 @@
 
     </android.support.v7.widget.RecyclerView>
 
+    <android.support.v4.widget.Space
+        android:layout_width="match_parent"
+        android:layout_height="15dp" />
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1">
 
+        <TableLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:stretchColumns="1,3">
+
+            <TableRow
+                android:id="@+id/row_http_ass"
+                android:layout_marginBottom="4dp">
+
+                <ImageView
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:src="@drawable/block_normal"
+                    android:tint="@color/colorHttp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Http Assigned Blocks" />
+
+                <TextView
+                    android:id="@+id/percent"
+                    android:layout_width="50dp"
+                    android:layout_height="wrap_content"
+                    android:text="10%" />
+
+                <TextView
+                    android:id="@+id/size"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="10MB" />
+            </TableRow>
+
+            <TableRow
+                android:id="@+id/row_http_down"
+                android:layout_marginBottom="4dp">
+
+                <ImageView
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:src="@drawable/block_ok"
+                    android:tint="@color/colorHttp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Http Downloaded Blocks" />
+
+                <TextView
+                    android:id="@id/percent"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="10%" />
+
+                <TextView
+                    android:id="@id/size"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="10MB" />
+            </TableRow>
+
+            <TableRow
+                android:id="@+id/row_p2p_ass"
+                android:layout_marginBottom="4dp">
+
+                <ImageView
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:src="@drawable/block_normal"
+                    android:tint="@color/colorP2p" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="P2P Assigned Blocks" />
+
+                <TextView
+                    android:id="@id/percent"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="10%" />
+
+                <TextView
+                    android:id="@id/size"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="10MB" />
+            </TableRow>
+
+            <TableRow
+                android:id="@+id/row_p2p_down"
+                android:layout_marginBottom="4dp">
+
+                <ImageView
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:src="@drawable/block_ok"
+                    android:tint="@color/colorP2p" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="P2P Downloaded Blocks" />
+
+                <TextView
+                    android:id="@id/percent"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="10%" />
+
+                <TextView
+                    android:id="@id/size"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="10MB" />
+            </TableRow>
+
+            <TableRow
+                android:id="@+id/row_other"
+                android:layout_marginBottom="4dp">
+
+                <ImageView
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:src="@drawable/block_normal"
+                    android:tint="@android:color/darker_gray" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Other Blocks" />
+
+                <TextView
+                    android:id="@id/percent"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="10%" />
+
+                <TextView
+                    android:id="@id/size"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="10MB" />
+            </TableRow>
+        </TableLayout>
     </LinearLayout>
 </LinearLayout>

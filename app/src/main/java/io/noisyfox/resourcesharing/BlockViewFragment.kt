@@ -10,6 +10,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
+import android.widget.TextView
 import io.noisyfox.resourcesharing.resmanager.BlockInspectionModel
 import kotlinx.android.synthetic.main.fragment_blocks.*
 import org.slf4j.LoggerFactory
@@ -63,6 +64,67 @@ class BlockViewFragment : Fragment() {
         val adapter = block_view.adapter as BlockViewAdapter
 
         adapter.setData(insp)
+
+        val meta = MainApplication.fileManager.getFile(MainApplication.TEST_FILE_1).metadata
+
+        var httpAss: Long = 0L
+        var httpDown: Long = 0L
+        var p2PAss: Long = 0L
+        var p2PDown: Long = 0L
+        var other: Long = 0L
+
+        meta.blocks.forEachIndexed { i, b ->
+            val ins = insp[i]
+            if (ins == null) {
+                other += b.size
+            } else {
+                if (ins.downloaded) {
+                    if (ins.url.startsWith("http", true)) {
+                        httpDown += b.size
+                    } else {
+                        p2PDown += b.size
+                    }
+                } else if (ins.distributed) {
+                    if (ins.url.startsWith("http", true)) {
+                        httpAss += b.size
+                    } else {
+                        p2PAss += b.size
+                    }
+                } else {
+                    other += b.size
+                }
+            }
+        }
+
+        RowHolder(row_http_ass).run {
+            size.text = toReadableSize(httpAss)
+            percent.text = toReadablePercent(httpAss, meta.size)
+        }
+
+        RowHolder(row_http_down).run {
+            size.text = toReadableSize(httpDown)
+            percent.text = toReadablePercent(httpDown, meta.size)
+        }
+
+        RowHolder(row_p2p_ass).run {
+            size.text = toReadableSize(p2PAss)
+            percent.text = toReadablePercent(p2PAss, meta.size)
+        }
+
+        RowHolder(row_p2p_down).run {
+            size.text = toReadableSize(p2PDown)
+            percent.text = toReadablePercent(p2PDown, meta.size)
+        }
+
+        RowHolder(row_other).run {
+            size.text = toReadableSize(other)
+            percent.text = toReadablePercent(other, meta.size)
+        }
+    }
+
+    private class RowHolder(row: View) {
+        val percent: TextView = row.findViewById(R.id.percent)
+        val size: TextView = row.findViewById(R.id.size)
     }
 
     private class BlockViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -73,7 +135,7 @@ class BlockViewFragment : Fragment() {
             val blockCount: Int
     ) : RecyclerView.Adapter<BlockViewHolder>() {
 
-        private var inspection: Map<Int, BlockInspectionModel>? = null
+        private var inspection: Map<Int, BlockInspectionModel> = mapOf()
 
         fun setData(insp: Map<Int, BlockInspectionModel>) {
             inspection = insp
@@ -89,10 +151,10 @@ class BlockViewFragment : Fragment() {
         override fun getItemCount(): Int = blockCount
 
         override fun onBindViewHolder(holder: BlockViewHolder, position: Int) {
-            val insp = inspection?.get(position)
+            val insp = inspection[position]
             if (insp == null) {
-                holder.blockView.setImageResource(R.drawable.block_normal)
                 holder.blockView.imageTintList = ColorStateList.valueOf(Color.GRAY)
+                holder.blockView.setImageResource(R.drawable.block_normal)
             } else {
                 holder.blockView.imageTintList = ColorStateList.valueOf(getColor(insp.url))
                 if (insp.downloaded) {
@@ -121,8 +183,8 @@ class BlockViewFragment : Fragment() {
             }
         }
 
-        private fun getColor(url: String): Int{
-            return if(url.startsWith("http", true)){
+        private fun getColor(url: String): Int {
+            return if (url.startsWith("http", true)) {
                 0xff93e045
             } else {
                 0xffFBC042

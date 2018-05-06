@@ -59,6 +59,14 @@ fun toReadableTime(millis: Long): String {
     return "%02d:%02d:%02d".format(s / 3600, (s % 3600) / 60, (s % 60))
 }
 
+fun toReadablePercent(p: Long, total: Long): String {
+    if (p == 0L || total == 0L) {
+        return "0%"
+    }
+
+    return "${p * 100L / total}%"
+}
+
 class GridAutoFitLayoutManager : GridLayoutManager {
     private var mColumnWidth: Int = 0
     private var mColumnWidthChanged = true
