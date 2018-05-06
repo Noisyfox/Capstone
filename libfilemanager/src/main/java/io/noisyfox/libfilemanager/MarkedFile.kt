@@ -3,14 +3,18 @@ package io.noisyfox.libfilemanager
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
-import java.io.*
+import java.io.File
+import java.io.FileInputStream
+import java.io.FileNotFoundException
+import java.io.IOException
+import java.io.InputStream
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
 class MarkedFile(
         val id: String,
         fileLock: ReentrantReadWriteLock,
-        manager: FileManager,
-        hash: String,
+        private val manager: FileManager,
+        private val hash: String,
         val metadata: MetadataModel) {
 
     internal val statusFile = File(manager.baseDir, "$hash.prog.json")
@@ -19,6 +23,8 @@ class MarkedFile(
     val readLock = fileLock.readLock()
 
     val writeLock = fileLock.writeLock()
+
+    fun getCompanionFile(suffix: String): File = File(manager.baseDir, "$hash.$suffix")
 
     /**
      * Get stream for read

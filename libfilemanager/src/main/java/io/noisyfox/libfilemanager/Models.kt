@@ -42,8 +42,7 @@ data class ProgressModel(
         }
         ensureNotComplete()
 
-        return ProgressModel(
-                completed = completed,
+        return copy(
                 completedBlocks = (completedBlocks + index).sorted(),
                 otherBlocks = otherBlocks.filter { it.key != index.toString() }
         )
@@ -54,7 +53,7 @@ data class ProgressModel(
             throw IllegalStateException("otherBlocks is not empty! Progress could lost!")
         }
 
-        return ProgressModel(true, completedBlocks, mapOf())
+        return copy(completed = true, otherBlocks = mapOf())
     }
 
     fun withStatus(index: Int, progress: BlockProgressModel): ProgressModel {
@@ -63,11 +62,7 @@ data class ProgressModel(
             throw IllegalStateException("Can't update a completed block!")
         }
 
-        return ProgressModel(
-                completed,
-                completedBlocks,
-                otherBlocks + Pair(index.toString(), progress)
-        )
+        return copy(otherBlocks = otherBlocks + Pair(index.toString(), progress))
     }
 
     private fun ensureNotComplete() {

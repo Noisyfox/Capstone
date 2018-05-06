@@ -1,10 +1,7 @@
 package io.noisyfox.resourcesharing.resmanager.downloader
 
 import io.noisyfox.libfilemanager.MarkedFileWriter
-import io.noisyfox.resourcesharing.resmanager.DownloaderStatistics
-import io.noisyfox.resourcesharing.resmanager.ResContext
-import io.noisyfox.resourcesharing.resmanager.safeClose
-import io.noisyfox.resourcesharing.resmanager.safeForEach
+import io.noisyfox.resourcesharing.resmanager.*
 import org.iotivity.base.OcResource
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -161,6 +158,23 @@ internal class MainDownloader(
         return currentStatus == DownloaderStatus.Stopped
     }
 
+    private fun getBlockDistribution(): Map<String, Set<Int>> {
+        service.assertOnWorkingThread()
+
+        val result = mutableMapOf<String, MutableSet<Int>>()
+        blockDistributeMap.values.forEach { (d, b) ->
+            val u = when (d) {
+                is HttpBlockDownloader -> d.url
+                is SharingBlockDownloader -> d.resource.url
+                else -> "Unknown"
+            }
+
+            result.getOrPut(u) { mutableSetOf() }.addAll(b)
+        }
+
+        return result
+    }
+
     /**
      * Rebalance blocks among downloaders
      */
@@ -226,6 +240,8 @@ internal class MainDownloader(
             // Give all to the last downloader!
             allDownloaders.last().assignBlocks2(unassignedBlocks.toSet())
         }
+
+        resContext.blockInspector.withBlockRedestributed(getBlockDistribution())
     }
 
     private fun BlockDownloader.getAssignedBlocksCount(): Int {
@@ -404,8 +420,16 @@ internal class MainDownloader(
 
     override fun onBlockDownloaded(downloader: BlockDownloader, block: Int) {
         service.runOnWorkingThread {
-            blockDistributeMap[downloader.id]?.second?.remove(block)
-            downloader.unassignBlocks(setOf(block))
+            downloader.unassignBlocks2(setOf(block))
+
+            when (downloader) {
+                is HttpBlockDownloader -> {
+                    resContext.blockInspector.withBlockDownloaded(block, downloader.url)
+                }
+                is SharingBlockDownloader -> {
+                    resContext.blockInspector.withBlockDownloaded(block, downloader.resource.url)
+                }
+            }
 
             logger.info("Block $block/${file.metadata.blocks.size - 1} download completed for file ${file.id} by downloader $downloader.")
             listeners.safeForEach {
@@ -429,8 +453,7 @@ internal class MainDownloader(
 
     override fun onBlockDownloadFailed(downloader: BlockDownloader, block: Int, ex: Throwable?) {
         service.runOnWorkingThread {
-            blockDistributeMap[downloader.id]?.second?.remove(block)
-            downloader.unassignBlocks(setOf(block))
+            downloader.unassignBlocks2(setOf(block))
 
             logger.info("Block $block/${file.metadata.blocks.size - 1} download failed for file ${file.id} by downloader $downloader.", ex)
             listeners.safeForEach {
@@ -442,7 +465,7 @@ internal class MainDownloader(
     }
 
     override fun onResourceFound(r: OcResource) {
-        logger.debug("Resource found: ${r.host}${r.uri}")
+        logger.debug("Resource found: ${r.url}")
 
         service.runOnWorkingThread {
             val w = fileWriter ?: return@runOnWorkingThread
@@ -455,7 +478,7 @@ internal class MainDownloader(
     }
 
     override fun onResourceLost(r: OcResource) {
-        logger.debug("Resource lost: ${r.host}${r.uri}")
+        logger.debug("Resource lost: ${r.url}")
 
         service.runOnWorkingThread {
             (components + componentEden)

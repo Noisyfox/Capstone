@@ -166,6 +166,12 @@ class ResService(
         f.statistics
     }
 
+    fun getBlockInspections(fileId: String): Map<Int, BlockInspectionModel> = runOnWorkingThread2<Map<Int, BlockInspectionModel>> {
+        val f = getResContext(fileId)
+
+        f.blockInspector.getInspections()
+    }
+
     private fun getResContext(fileId: String): ResContext = managedResources[fileId]
             ?: throw FileNotFoundException("File $fileId not registered!")
 

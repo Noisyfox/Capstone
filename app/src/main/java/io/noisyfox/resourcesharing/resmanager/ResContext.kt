@@ -18,6 +18,7 @@ internal class ResContext(
         val file: MarkedFile
 ) : Closeable {
 
+    val blockInspector: BlockInspector = BlockInspector(file)
     private val downloader: MainDownloader = MainDownloader(this)
 
     private val baseHash = file.metadata.name.getSHA256HexString()
@@ -130,6 +131,7 @@ internal class ResContext(
         w.use {
             w.clearFile()
         }
+        blockInspector.clear()
     }
 
     fun startDownload(enableHttp: Boolean, enableResourceFinder: Boolean) {

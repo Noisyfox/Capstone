@@ -14,14 +14,14 @@ import java.io.Closeable
 import java.io.IOException
 import java.io.InputStream
 import java.net.HttpURLConnection
-import java.util.*
+import java.util.PriorityQueue
 import kotlin.concurrent.thread
 import kotlin.math.min
 
 
 internal class HttpBlockDownloader(
         override val id: Long,
-        private val url: String,
+        val url: String,
         private val fileWriter: MarkedFileWriter,
         private val statistics: DownloaderStatistics
 ) : BlockDownloader {
